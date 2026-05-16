@@ -1,0 +1,12 @@
+numpy
+pandas
+yfinance
+torch
+scikit-learn
+hmmlearn
+scipy
+optuna
+plotly
+openpyxl
+streamlit
+PyYAML
