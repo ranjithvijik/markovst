@@ -1076,7 +1076,19 @@ def build_portfolio_figure(port_results: Dict[str, Any]):
         c_idx += 1
         
     stats = port_results['portfolio_stats']
-    ["P-Value (vs 0)", f"{tests.get('t_pvalue', np.nan):.4f}"], ["Deflated Sharpe", f"{tests.get('deflated_sharpe_ratio', np.nan):.1%}"]
+    tests = port_results.get('portfolio_stat_tests', {})
+    
+    stat_data = [
+        ["CAGR", f"{stats.get('cagr', np.nan)*100:.2f}%"],
+        ["Volatility", f"{stats.get('vol', np.nan)*100:.2f}%"],
+        ["Max Drawdown", f"{stats.get('max_dd', np.nan)*100:.2f}%"],
+        ["Sharpe Ratio", f"{stats.get('sharpe', np.nan):.3f}"],
+        ["Sortino Ratio", f"{stats.get('sortino', np.nan):.3f}"],
+        ["Avg Correlation", f"{stats.get('avg_correlation', np.nan):.3f}"],
+        ["P-Value (vs 0)", f"{tests.get('t_pvalue', np.nan):.4f}"],
+        ["Deflated Sharpe", f"{tests.get('deflated_sharpe_ratio', np.nan):.1%}"]
+    ]
+    
     fig.add_trace(go.Table(header=dict(values=["Metric", "Value"], fill_color="#1F4E78", font=dict(color="white", size=12), align="center"), cells=dict(values=[[row[0] for row in stat_data], [row[1] for row in stat_data]], fill_color=[["#f7f6f2", "#ffffff"] * len(stat_data)], font=dict(color="#1a1a1a", size=12), align=["left", "center"], height=25)), row=1, col=2)
     
     dd = port_eq / port_eq.cummax() - 1
@@ -1269,7 +1281,7 @@ def main():
     n_splits = st.sidebar.slider("CV Splits", 2, 10, 5)
     anchored = st.sidebar.checkbox("Anchored Walk-Forward", value=False)
 
-    if st.sidebar.button("🚀 Run Backtest", use_container_width=True, type="primary"):
+    if st.sidebar.button("🚀 Run Backtest", width="stretch", type="primary"):
         config = Config()
         config.data.period = period
         config.data.interval = interval
@@ -1291,12 +1303,11 @@ def main():
         config.risk.max_drawdown_halt = max_dd_halt
         config.tuning.enabled = enable_tune
         config.tuning.n_trials = n_trials
-    config.backtest.n_splits = n_splits
-    config.backtest.anchored = anchored
+        config.backtest.n_splits = n_splits
+        config.backtest.anchored = anchored
 
-    if st.sidebar.button("🚀 Run Backtest", width="stretch", type="primary"):
-        config = Config()
-        config.data.period = period
+        progress_bar = st.progress(0.0)
+        status_text = st.empty()
         start_time = time.time()
 
         try:
