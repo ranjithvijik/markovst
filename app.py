@@ -553,9 +553,11 @@ def _val_sharpe(model: nn.Module, X_val: np.ndarray, y_val_ret: np.ndarray, devi
     prob = 1.0 / (1.0 + np.exp(-logits))
     sig = np.where(prob >= prob_long, 1, np.where(prob <= prob_short, -1, 0))
     min_len = min(len(sig), len(y_ret_aligned))
+    if min_len == 0: return -np.inf
     r = sig[:min_len] * np.asarray(y_ret_aligned)[:min_len]
-    if len(r) == 0 or r.std() == 0: return -np.inf
-    return (r.mean() / r.std()) * np.sqrt(252)
+    r_std = r.std()
+    if len(r) == 0 or r_std == 0 or np.isnan(r_std): return -np.inf
+    return (r.mean() / r_std) * np.sqrt(252)
 
 def train_nn(X_train: np.ndarray, y_train: np.ndarray, X_val: np.ndarray, y_val: np.ndarray, y_val_ret: np.ndarray, prob_long: float, prob_short: float, architecture: str = "mlp", epochs: int = 120, batch_size: int = 64, lr: float = 1e-3, hidden_dim: int = 64, dropout: float = 0.25, weight_decay: float = 1e-4, patience: int = 15, clip_grad: float = 1.0, num_layers: int = 2, seq_len: int = 20, use_mixed_precision: bool = False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -575,7 +577,7 @@ def train_nn(X_train: np.ndarray, y_train: np.ndarray, X_val: np.ndarray, y_val:
     model = get_model_class(architecture)(input_dim=X_train.shape[1], hidden_dim=hidden_dim, dropout=dropout, num_layers=num_layers, seq_len=seq_len).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     criterion = nn.BCEWithLogitsLoss()
-    scaler = torch.cuda.amp.GradScaler() if use_mixed_precision and device.type == "cuda" else None
+    scaler = torch.amp.GradScaler('cuda') if use_mixed_precision and device.type == "cuda" else None
     
     best_sharpe = -np.inf
     best_state = None
@@ -587,7 +589,7 @@ def train_nn(X_train: np.ndarray, y_train: np.ndarray, X_val: np.ndarray, y_val:
             xb, yb = xb.to(device), yb.to(device)
             optimizer.zero_grad()
             if scaler is not None:
-                with torch.cuda.amp.autocast(): loss = criterion(model(xb), yb)
+                with torch.amp.autocast('cuda'): loss = criterion(model(xb), yb)
                 scaler.scale(loss).backward()
                 scaler.unscale_(optimizer)
                 nn.utils.clip_grad_norm_(model.parameters(), clip_grad)
@@ -1302,44 +1304,59 @@ def main():
         config.risk.take_profit_pct = take_profit
         config.risk.max_drawdown_halt = max_dd_halt
         config.tuning.enabled = enable_tune
-        config.tuning.n_trials = n_trials
-        config.backtest.n_splits = n_splits
-        config.backtest.anchored = anchored
+    config.tuning.n_trials = n_trials
+    config.backtest.n_splits = n_splits
+    config.backtest.anchored = anchored
 
-        progress_bar = st.progress(0.0)
-        status_text = st.empty()
-        start_time = time.time()
+    if st.sidebar.button("🚀 Run Backtest", width="stretch", type="primary"):
+        # Clear state to prevent partial renders/race conditions
+        for key in ['fig', 'results', 'summary', 'monthly', 'stats', 'excel', 'html', 'port_res', 'run_complete']:
+            if key in st.session_state:
+                del st.session_state[key]
 
+        config = Config()
+        config.data.period = period
+        config.data.interval = interval
+        config.model.architecture = architecture
         try:
             if mode == "Single Asset":
                 config.data.ticker = tickers_list[0]
                 results, summary, monthly, hp_df, stats = run_hybrid_backtest(config, progress_bar, status_text)
                 fig = build_single_asset_figure(results, summary, hp_df, stats)
                 
-                # Store to session state for rendering
-                st.session_state['mode'] = mode
-                st.session_state['fig'] = fig
-                st.session_state['results'] = results
-                st.session_state['summary'] = summary
-                st.session_state['monthly'] = monthly
-                st.session_state['stats'] = stats
-                
                 # Build Downloads
                 excel_bytes = generate_excel_bytes(results, summary, monthly, hp_df, stats, config)
-                st.session_state['excel'] = excel_bytes
-                st.session_state['html'] = generate_html_string(fig.to_html(full_html=False, include_plotlyjs="cdn"), f"{tickers_list[0]}", stats)
+                html_str = generate_html_string(fig.to_html(full_html=False, include_plotlyjs="cdn"), f"{tickers_list[0]}", stats)
+                
+                # Atomic update of session state
+                st.session_state.update({
+                    'mode': mode,
+                    'fig': fig,
+                    'results': results,
+                    'summary': summary,
+                    'monthly': monthly,
+                    'stats': stats,
+                    'excel': excel_bytes,
+                    'html': html_str,
+                    'run_complete': True
+                })
                 
             else:
                 port_res = run_portfolio_backtest(tickers_list, config, progress_bar, status_text)
                 fig = build_portfolio_figure(port_res)
                 
-                st.session_state['mode'] = mode
-                st.session_state['fig'] = fig
-                st.session_state['port_res'] = port_res
-                st.session_state['summary'] = pd.DataFrame([port_res['portfolio_stats']])
-                
                 # Build Downloads for Portfolio
-                st.session_state['html'] = generate_html_string(fig.to_html(full_html=False, include_plotlyjs="cdn"), "Portfolio", port_res['portfolio_stat_tests'])
+                html_str = generate_html_string(fig.to_html(full_html=False, include_plotlyjs="cdn"), "Portfolio", port_res['portfolio_stat_tests'])
+
+                # Atomic update of session state
+                st.session_state.update({
+                    'mode': mode,
+                    'fig': fig,
+                    'port_res': port_res,
+                    'summary': pd.DataFrame([port_res['portfolio_stats']]),
+                    'html': html_str,
+                    'run_complete': True
+                })
 
             status_text.success(f"Execution Completed in {time.time() - start_time:.1f}s")
             time.sleep(1)
@@ -1350,7 +1367,7 @@ def main():
             st.error(f"Error during backtest: {str(e)}")
             progress_bar.empty()
 
-    if 'fig' in st.session_state:
+    if st.session_state.get('run_complete', False) and 'fig' in st.session_state:
         tab1, tab2, tab3 = st.tabs(["📊 Dashboard View", "📋 Data & Metrics", "💾 Downloads"])
         
         with tab1:
