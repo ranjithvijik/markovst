@@ -1076,9 +1076,8 @@ def build_portfolio_figure(port_results: Dict[str, Any]):
         c_idx += 1
         
     stats = port_results['portfolio_stats']
-    tests = port_results['portfolio_stat_tests']
-    stat_data = [["CAGR", f"{stats.get('cagr', np.nan)*100:.2f}%"], ["Volatility", f"{stats.get('vol', np.nan)*100:.2f}%"], ["Max Drawdown", f"{stats.get('max_dd', np.nan)*100:.2f}%"], ["Sharpe Ratio", f"{stats.get('sharpe', np.nan):.3f}"], ["Sortino Ratio", f"{stats.get('sortino', np.nan):.3f}"], ["Avg Correlation", f"{stats.get('avg_correlation', np.nan):.3f}"], ["P-Value (vs 0)", f"{tests.get('t_pvalue', np.nan):.4f}"], ["Deflated Sharpe", f"{tests.get('deflated_sharpe_ratio', np.nan):.1%}"]]
-    fig.add_trace(go.Table(header=dict(values=["Metric", "Value"], fill_color="#1F4E78", font=dict(color="white", size=12), align="center"), cells=dict(values=[[row[0] for row in stat_data], [row[1] for row in stat_data]], fill_color=[["#f7f6f2", "#ffffff"] * len(stat_data)], align=["left", "center"], height=25)), row=1, col=2)
+    ["P-Value (vs 0)", f"{tests.get('t_pvalue', np.nan):.4f}"], ["Deflated Sharpe", f"{tests.get('deflated_sharpe_ratio', np.nan):.1%}"]
+    fig.add_trace(go.Table(header=dict(values=["Metric", "Value"], fill_color="#1F4E78", font=dict(color="white", size=12), align="center"), cells=dict(values=[[row[0] for row in stat_data], [row[1] for row in stat_data]], fill_color=[["#f7f6f2", "#ffffff"] * len(stat_data)], font=dict(color="#1a1a1a", size=12), align=["left", "center"], height=25)), row=1, col=2)
     
     dd = port_eq / port_eq.cummax() - 1
     fig.add_trace(go.Scatter(x=dd.index, y=dd, name="Portfolio DD", line=dict(color="#a12c7b", width=1.5), fill="tozeroy", fillcolor="rgba(161, 44, 123, 0.2)"), row=2, col=1)
@@ -1292,12 +1291,12 @@ def main():
         config.risk.max_drawdown_halt = max_dd_halt
         config.tuning.enabled = enable_tune
         config.tuning.n_trials = n_trials
-        config.backtest.n_splits = n_splits
-        config.backtest.anchored = anchored
+    config.backtest.n_splits = n_splits
+    config.backtest.anchored = anchored
 
-        st.session_state.clear()
-        progress_bar = st.progress(0.0)
-        status_text = st.empty()
+    if st.sidebar.button("🚀 Run Backtest", width="stretch", type="primary"):
+        config = Config()
+        config.data.period = period
         start_time = time.time()
 
         try:
@@ -1344,24 +1343,26 @@ def main():
         tab1, tab2, tab3 = st.tabs(["📊 Dashboard View", "📋 Data & Metrics", "💾 Downloads"])
         
         with tab1:
-            st.plotly_chart(st.session_state['fig'], use_container_width=True)
+            st.plotly_chart(st.session_state['fig'], width="stretch")
             
         with tab2:
             st.subheader("Performance Summary")
-            st.dataframe(st.session_state['summary'], use_container_width=True)
+            st.dataframe(st.session_state['summary'], width="stretch")
             
             if st.session_state['mode'] == "Single Asset":
                 col1, col2 = st.columns(2)
                 with col1:
                     st.subheader("Statistical Tests")
                     stat_df = pd.DataFrame([{"Metric": k, "Value": v} for k, v in st.session_state['stats'].items() if not isinstance(v, (tuple, list, dict))])
-                    st.dataframe(stat_df, use_container_width=True)
+                    # Fix PyArrow mixed-type serialization error
+                    stat_df["Value"] = stat_df["Value"].astype(str)
+                    st.dataframe(stat_df, width="stretch")
                 with col2:
                     st.subheader("Monthly Returns")
-                    st.dataframe(st.session_state['monthly'], use_container_width=True)
+                    st.dataframe(st.session_state['monthly'], width="stretch")
                     
                 st.subheader("Raw Output (Tail)")
-                st.dataframe(st.session_state['results'].tail(100), use_container_width=True)
+                st.dataframe(st.session_state['results'].tail(100), width="stretch")
             else:
                 col1, col2 = st.columns(2)
                 with col1:
