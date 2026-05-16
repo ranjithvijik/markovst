@@ -1001,7 +1001,7 @@ def build_single_asset_figure(results: pd.DataFrame, summary: pd.DataFrame, hp_d
         if col in sm.columns: sm[col] = (sm[col] * 100).round(2).astype(str) + "%"
     for col in ["sharpe", "sortino", "calmar"]:
         if col in sm.columns: sm[col] = sm[col].round(2)
-    fig.add_trace(go.Table(header=dict(values=list(sm.columns), fill_color="#1F4E78", font=dict(color="white", size=11), align="center"), cells=dict(values=[sm[c].tolist() for c in sm.columns], fill_color=[["#f7f6f2", "#ffffff"] * len(sm)], align=["left"] + ["center"] * (len(sm.columns) - 1), height=25)), row=1, col=2)
+    fig.add_trace(go.Table(header=dict(values=list(sm.columns), fill_color="#1F4E78", font=dict(color="white", size=11), align="center"), cells=dict(values=[sm[c].tolist() for c in sm.columns], fill_color=[["#f7f6f2", "#ffffff"] * len(sm)], font=dict(color="#1a1a1a", size=11), align=["left"] + ["center"] * (len(sm.columns) - 1), height=25)), row=1, col=2)
     
     for col, name, color in [("dd_strategy", "Hybrid DD", COLORS["dd_hybrid"]), ("dd_buyhold", "B&H DD", COLORS["dd_bh"]), ("dd_logistic", "Logistic DD", COLORS["dd_lr"])]:
         if col in r.columns:
@@ -1035,7 +1035,7 @@ def build_single_asset_figure(results: pd.DataFrame, summary: pd.DataFrame, hp_d
         ["Significant (5%)", "Yes" if stat_tests.get('significant_at_5pct', False) else "No"],
         ["Total Trials Tested", f"{stat_tests.get('n_trials_tested', 1)}"],
     ]
-    fig.add_trace(go.Table(header=dict(values=["Metric", "Value"], fill_color="#2E7D32", font=dict(color="white", size=11), align="center"), cells=dict(values=[[row[0] for row in stat_data], [row[1] for row in stat_data]], fill_color=[["#f7f6f2", "#ffffff"] * len(stat_data)], align=["left", "center"], height=22)), row=4, col=2)
+    fig.add_trace(go.Table(header=dict(values=["Metric", "Value"], fill_color="#2E7D32", font=dict(color="white", size=11), align="center"), cells=dict(values=[[row[0] for row in stat_data], [row[1] for row in stat_data]], fill_color=[["#f7f6f2", "#ffffff"] * len(stat_data)], font=dict(color="#1a1a1a", size=11), align=["left", "center"], height=22)), row=4, col=2)
     
     if "strategy_log_ret" in results.columns:
         rolling_sharpe = (results["strategy_log_ret"].rolling(63).mean() / results["strategy_log_ret"].rolling(63).std()) * np.sqrt(252)
