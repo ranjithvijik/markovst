@@ -1,3 +1,5 @@
+from multitasking import config
+from optuna import trial
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -663,8 +665,10 @@ def tune_hyperparams(X_train: np.ndarray, y_train: np.ndarray, fwd_train: np.nda
         n_states = trial.suggest_categorical("n_states", [2, 3, 4])
         architecture = trial.suggest_categorical("architecture", ["mlp", "resnet"])
         hidden_dim = trial.suggest_categorical("hidden_dim", [32, 64])
-        dropout = trial.suggest_categorical("dropout", [0.20, 0.35])
+        dropout = trial.suggest_categorical("dropout", [0.10, 0.20, 0.35])
         lr = trial.suggest_categorical("lr", [5e-4, 1e-3])
+        batch_size = trial.suggest_categorical("batch_size", [32, 64])
+        trial_seq_len = trial.suggest_categorical("seq_len", [20, 30, 40])
         sharpes = []
         n_states_cache = hmm_cache[n_states]
         
@@ -679,8 +683,8 @@ def tune_hyperparams(X_train: np.ndarray, y_train: np.ndarray, fwd_train: np.nda
             
             try:
                 is_seq = is_sequential_model(architecture)
-                m_i = train_nn(Xtr_h, y_train[itr_idx], Xvl_h, y_train[ival_idx], fwd_train[ival_idx], prob_long=prob_long, prob_short=prob_short, architecture=architecture, hidden_dim=hidden_dim, dropout=dropout, lr=lr, epochs=60, patience=8, seq_len=seq_len, use_mixed_precision=use_mixed_precision)
-                prob_i = predict_proba(m_i, Xvl_h, is_seq, seq_len)
+                m_i = train_nn(Xtr_h, y_train[itr_idx], Xvl_h, y_train[ival_idx], fwd_train[ival_idx], prob_long=prob_long, prob_short=prob_short, architecture=architecture, hidden_dim=hidden_dim, dropout=dropout, lr=lr, epochs=60, patience=8, batch_size=batch_size, seq_len=trial_seq_len, use_mixed_precision=use_mixed_precision)
+                prob_i = predict_proba(m_i, Xvl_h, is_seq, trial_seq_len)
                 valid_mask = ~np.isnan(prob_i)
                 if valid_mask.sum() == 0: continue
                 
@@ -842,12 +846,18 @@ def run_hybrid_backtest(config: Config, progress_bar, status_text) -> Tuple[pd.D
             def opt_cb(t_num): status_text.text(f"Fold {fold}: Tuning Optuna Trial {t_num}/{config.tuning.n_trials}")
             
             best_hp, best_hp_score = tune_hyperparams(X_train_df.values, y_train.values, r_train.values, config.trading.prob_long, config.trading.prob_short, config.trading.regime_gate, config.trading.churn_window, config.trading.max_churn, n_trials=config.tuning.n_trials, inner_splits=config.tuning.inner_splits, seed=config.backtest.seed, use_student_t_hmm=config.model.use_student_t_hmm, seq_len=config.model.seq_len, use_mixed_precision=config.model.use_mixed_precision, progress_callback=opt_cb)
-            n_states_fold, architecture_fold, hidden_dim_f, dropout_f, lr_f = best_hp["n_states"], best_hp.get("architecture", config.model.architecture), best_hp["hidden_dim"], best_hp["dropout"], best_hp["lr"]
+            n_states_fold = best_hp["n_states"]
+            architecture_fold = best_hp.get("architecture", config.model.architecture)
+            hidden_dim_f = best_hp["hidden_dim"]
+            dropout_f = best_hp["dropout"]
+            lr_f = best_hp["lr"]
+            batch_size_f = best_hp.get("batch_size", 64)
+            seq_len_f = best_hp.get("seq_len", config.model.seq_len)
         else:
             n_states_fold, architecture_fold, hidden_dim_f, dropout_f, lr_f = config.model.n_states, config.model.architecture, config.model.hidden_dim, config.model.dropout, config.model.lr
             best_hp_score = np.nan
             
-        hp_log.append({"fold": fold, "n_states": n_states_fold, "architecture": architecture_fold, "hidden_dim": hidden_dim_f, "dropout": dropout_f, "lr": lr_f, "inner_sharpe": best_hp_score})
+        hp_log.append({"fold": fold, "n_states": n_states_fold, "architecture": architecture_fold, "hidden_dim": hidden_dim_f, "dropout": dropout_f, "lr": lr_f, "batch_size": batch_size_f, "seq_len": seq_len_f, "inner_sharpe": best_hp_score})
             
         scaler = StandardScaler()
         X_train_scaled, X_val_scaled, X_test_scaled = scaler.fit_transform(X_train_df), scaler.transform(X_val_df), scaler.transform(X_test_df)
@@ -870,7 +880,7 @@ def run_hybrid_backtest(config: Config, progress_bar, status_text) -> Tuple[pd.D
         
         status_text.text(f"Fold {fold}: Training PyTorch Neural Network ({architecture_fold})...")
         is_seq = is_sequential_model(architecture_fold)
-        model = train_nn(X_train_h, y_train.values, X_val_h, y_val.values, r_val.values, prob_long=config.trading.prob_long, prob_short=config.trading.prob_short, architecture=architecture_fold, hidden_dim=hidden_dim_f, dropout=dropout_f, lr=lr_f, num_layers=config.model.num_layers, seq_len=config.model.seq_len, use_mixed_precision=config.model.use_mixed_precision)
+        model = train_nn(X_train_h, y_train.values, X_val_h, y_val.values, r_val.values, prob_long=config.trading.prob_long, prob_short=config.trading.prob_short, architecture=architecture_fold, hidden_dim=hidden_dim_f, dropout=dropout_f, lr=lr_f, num_layers=config.model.num_layers, batch_size=batch_size_f, seq_len=seq_len_f, use_mixed_precision=config.model.use_mixed_precision)
         
         prob_up = predict_proba(model, X_test_h, is_seq, config.model.seq_len)
         valid_pred = ~np.isnan(prob_up)
