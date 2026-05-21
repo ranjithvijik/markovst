@@ -25,7 +25,8 @@
 2. [Who Benefits and How](#-who-benefits-and-how)
 3. [Installation](#-installation)
 4. [Quick Start](#-quick-start)
-5. [Streamlit UI — Complete Guide](#-streamlit-ui--complete-guide)
+5. [Visual Walkthrough](#-visual-walkthrough)
+6. [Streamlit UI — Complete Guide](#-streamlit-ui--complete-guide)
    - [Backtest Mode](#1-backtest-mode)
    - [Data Settings](#2-data-settings)
    - [Model Architectures](#3-model-architectures)
@@ -142,9 +143,66 @@ python -c "import torch; import hmmlearn; import optuna; import streamlit; print
 streamlit run app.py
 ```
 
-Opens at `http://localhost:8501`. Configure via the sidebar (detailed below), then click **🚀 Run Backtest**.
+Open the app at `http://localhost:8501`, configure the strategy from the sidebar, and click **🚀 Run Backtest**.
+
+See the **Visual Walkthrough** below for a screenshot-based tour of the inputs, outputs, and export artifacts.
 
 ---
+
+---
+
+## 📸 Visual Walkthrough
+
+This app follows a simple workflow: configure the backtest in the sidebar, run the experiment, inspect the dashboard, validate the metrics, and export the final artifacts.
+
+### 1. Configure the inputs
+
+The left sidebar controls the full experiment setup. From here, you define the asset or portfolio, data history, model architecture, HMM regime settings, trading thresholds, risk overlays, hyperparameter tuning behavior, and walk-forward validation options.
+
+#### Sidebar overview
+![Sidebar overview](docs/images/sidebar-overview.jpg)
+
+#### Advanced sidebar settings
+![Advanced sidebar settings](docs/images/sidebar-advanced.jpg)
+
+#### Trading, risk, and tuning controls
+![Trading, risk, and tuning controls](docs/images/sidebar-trading-risk.jpg)
+
+### 2. Review the dashboard output
+
+Once you click **🚀 Run Backtest**, the app generates a rich dashboard that combines performance visualization with model diagnostics. This includes equity curves, benchmark comparisons, drawdowns, signal overlays, regime behavior, rolling Sharpe, annual return comparisons, and hyperparameter tuning logs.
+
+#### Main dashboard
+![Main dashboard](docs/images/dashboard-main.jpg)
+
+#### Diagnostics view
+![Dashboard diagnostics](docs/images/dashboard-diagnostics.jpg)
+
+#### Signals and drawdowns
+![Dashboard signals and drawdowns](docs/images/dashboard-signals.jpg)
+
+### 3. Validate the tabular metrics
+
+The **Data & Metrics** tab is where you confirm whether the strategy is actually worth trusting. It surfaces the headline performance summary, statistical significance tests, and monthly returns tables in a format that is easier to audit before acting on results.
+
+![Data and Metrics tab](docs/images/data-metrics-tab.jpg)
+
+### 4. Export the artifacts
+
+The **Downloads** tab lets you package the run for research, sharing, or offline review. You can export the master Excel workbook, the interactive HTML dashboard, and the raw logs / CSV outputs.
+
+![Downloads tab](docs/images/downloads-tab.jpg)
+
+### 5. Recommended reading order
+
+For a new run, review results in this order:
+
+1. **Performance Summary** — check CAGR, Sharpe, Sortino, drawdown, and hit rate.
+2. **Statistical Tests** — verify whether the apparent edge is statistically meaningful.
+3. **Equity Curves and Drawdowns** — inspect path dependency and downside behavior.
+4. **Signals / Regimes** — confirm the model is trading when conditions are stable.
+5. **Downloads** — export Excel, HTML, and logs for deeper analysis.
+
 
 ## 🖥️ Streamlit UI — Complete Guide
 
