@@ -1,5 +1,3 @@
-from multitasking import config
-from optuna import trial
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -854,7 +852,13 @@ def run_hybrid_backtest(config: Config, progress_bar, status_text) -> Tuple[pd.D
             batch_size_f = best_hp.get("batch_size", 64)
             seq_len_f = best_hp.get("seq_len", config.model.seq_len)
         else:
-            n_states_fold, architecture_fold, hidden_dim_f, dropout_f, lr_f = config.model.n_states, config.model.architecture, config.model.hidden_dim, config.model.dropout, config.model.lr
+            n_states_fold = config.model.n_states
+            architecture_fold = config.model.architecture
+            hidden_dim_f = config.model.hidden_dim
+            dropout_f = config.model.dropout
+            lr_f = config.model.lr
+            batch_size_f = 64
+            seq_len_f = config.model.seq_len
             best_hp_score = np.nan
             
         hp_log.append({"fold": fold, "n_states": n_states_fold, "architecture": architecture_fold, "hidden_dim": hidden_dim_f, "dropout": dropout_f, "lr": lr_f, "batch_size": batch_size_f, "seq_len": seq_len_f, "inner_sharpe": best_hp_score})
@@ -882,7 +886,7 @@ def run_hybrid_backtest(config: Config, progress_bar, status_text) -> Tuple[pd.D
         is_seq = is_sequential_model(architecture_fold)
         model = train_nn(X_train_h, y_train.values, X_val_h, y_val.values, r_val.values, prob_long=config.trading.prob_long, prob_short=config.trading.prob_short, architecture=architecture_fold, hidden_dim=hidden_dim_f, dropout=dropout_f, lr=lr_f, num_layers=config.model.num_layers, batch_size=batch_size_f, seq_len=seq_len_f, use_mixed_precision=config.model.use_mixed_precision)
         
-        prob_up = predict_proba(model, X_test_h, is_seq, config.model.seq_len)
+        prob_up = predict_proba(model, X_test_h, is_seq, seq_len_f)
         valid_pred = ~np.isnan(prob_up)
         prob_up = np.where(valid_pred, prob_up, 0.5)
         prob_best = test_sp[:, best_state] if best_state >= 0 else np.zeros(len(test_sp))
