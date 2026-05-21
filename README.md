@@ -1,9 +1,8 @@
 <p align="center">
   <h1 align="center">📈 Hybrid Markov + Neural Network Backtester</h1>
   <p align="center">
-    <strong>Institutional-Grade Quantitative Trading Framework</strong><br>
-    Combining Hidden Markov Models for Regime Detection with PyTorch Neural Networks for Signal Generation<br>
-    <em>Hyperparameter Search Space Informed by CS 230 (Stanford) LSTM Research</em>
+    <strong>Quantitative Trading Framework</strong><br>
+    Combining Hidden Markov Models for Regime Detection with PyTorch Neural Networks for Signal Generation
   </p>
   <p align="center">
     <a href="#-quick-start">Quick Start</a> •
@@ -1273,28 +1272,3 @@ markovst/
 | `numpy` | ≥1.23 | Numerical computation |
 
 ---
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/my-enhancement`
-3. Make changes to `app.py`
-4. Test with at least one full backtest run (SPY, 10y, mlp, 5 trials)
-5. Submit a pull request with a description of what changed and why
-
-**Good areas for contribution:**
-- New neural network architectures
-- Additional technical indicators
-- Live trading broker integration
-- Multi-timeframe feature engineering
-- Portfolio optimization (beyond equal weight)
-
----
-
-## 📄 License
-
-MIT License — see [LICENSE](LICENSE) for details. Free to use, modify, and distribute with attribution.
-
----
-
-*Built with ❤️ using PyTorch, hmmlearn, Optuna, and Streamlit.*
