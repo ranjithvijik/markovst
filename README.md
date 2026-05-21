@@ -7,7 +7,8 @@
   </p>
   <p align="center">
     <a href="#-quick-start">Quick Start</a> •
-    <a href="#-streamlit-ui-complete-guide">UI Guide</a> •
+    <a href="#-visual-walkthrough">Visual Walkthrough</a> •
+    <a href="#-streamlit-ui--complete-guide">UI Guide</a> •
     <a href="#-how-the-math-works-and-why-it-matters">Math</a> •
     <a href="#-installation">Installation</a> •
     <a href="#-who-benefits-and-how">Benefits</a>
@@ -35,23 +36,23 @@
    - [Hyperparameter Tuning](#6-hyperparameter-tuning)
    - [Validation & Walk-Forward](#7-validation--walk-forward)
    - [Run Backtest Button](#8-run-backtest)
-6. [What's New — CS 230 Paper Integration](#-whats-new--cs-230-paper-integration)
-7. [Architecture](#-architecture)
-8. [How the Math Works and Why It Matters](#-how-the-math-works-and-why-it-matters)
-9. [Understanding the Outputs](#-understanding-the-outputs)
-10. [Pipeline Deep Dive](#-pipeline-deep-dive)
-11. [Code Architecture](#-code-architecture)
-12. [How It Works — Decision Flow](#-how-it-works--decision-flow)
-13. [Example Recipes](#-example-recipes)
-14. [Extending the Framework](#-extending-the-framework)
-15. [Known Limitations](#-known-limitations)
-16. [Academic References](#-academic-references)
-17. [Project Structure](#-project-structure)
-18. [Performance Notes](#-performance-notes)
-19. [Troubleshooting](#-troubleshooting)
-20. [Dependencies](#-dependencies)
-21. [Contributing](#-contributing)
-22. [License](#-license)
+7. [What's New — CS 230 Paper Integration](#-whats-new--cs-230-paper-integration)
+8. [Architecture](#-architecture)
+9. [How the Math Works and Why It Matters](#-how-the-math-works-and-why-it-matters)
+10. [Understanding the Outputs](#-understanding-the-outputs)
+11. [Pipeline Deep Dive](#-pipeline-deep-dive)
+12. [Code Architecture](#-code-architecture)
+13. [How It Works — Decision Flow](#-how-it-works--decision-flow)
+14. [Example Recipes](#-example-recipes)
+15. [Extending the Framework](#-extending-the-framework)
+16. [Known Limitations](#-known-limitations)
+17. [Academic References](#-academic-references)
+18. [Project Structure](#-project-structure)
+19. [Performance Notes](#-performance-notes)
+20. [Troubleshooting](#-troubleshooting)
+21. [Dependencies](#-dependencies)
+22. [Contributing](#-contributing)
+23. [License](#-license)
 
 </details>
 
@@ -65,11 +66,25 @@ This system predicts whether stock prices will go **up or down tomorrow**, then 
 
 It combines two powerful ideas:
 
-1. **Hidden Markov Models (HMM)** — A statistical method that figures out what "mood" the market is in (bull market, bear market, or uncertain). Think of it as a weather forecast for the stock market.
+1. **Hidden Markov Models (HMM)** — A statistical method that identifies the latent "mood" of the market (bull, bear, or uncertain). Think of it as a weather forecast for market regimes: before you act on a trade signal, you first check whether conditions are clear enough to act.
 
 2. **Deep Learning Neural Networks (PyTorch)** — Four different AI architectures (MLP, ResNet, LSTM, Transformer) that learn patterns from 21 technical indicators to predict price direction.
 
-The key innovation is that **the HMM acts as a gatekeeper** — the neural network's predictions are only acted upon when the market is in a clear, stable regime. This prevents the system from trading during chaotic, unpredictable periods.
+The key innovation is that **the HMM acts as a gatekeeper**: the neural network's predictions are only acted upon when the market is in a clear, stable regime. This prevents the system from trading during chaotic, unpredictable periods and is the main reason the strategy avoids large drawdowns during crash events.
+
+### Core Innovation: Regime-Gated Prediction
+
+Most ML trading systems train a classifier and act on every signal. This system adds a second layer of logic:
+
+```
+Signal VALID only if:
+  1. Market regime is stable (HMM confidence ≥ gate threshold)
+  2. Regime has been consistent (no frequent flipping)
+  3. NN probability clears the long or short threshold
+  4. Position sized by realized volatility
+```
+
+This architecture is directly inspired by institutional systematic trading desks that separate *regime identification* from *signal generation*.
 
 ### System Architecture
 
@@ -81,9 +96,9 @@ The key innovation is that **the HMM acts as a gatekeeper** — the neural netwo
 └─────────────┘    └──────────────┘    └──────┬────────┘    └──────┬───────┘
                                               │                    │
                    ┌──────────────┐    ┌──────▼────────┐           │
-                   │  Streamlit UI│◀───│  Walk-Forward │◀──────────┘
-                   │  + Excel     │    │  Backtesting  │
-                   │  + HTML/CSV  │    │  + Optuna     │
+                   │  Streamlit   │◀───│  Walk-Forward │◀──────────┘
+                   │  Dashboard   │    │  Backtesting  │
+                   │  + Exports   │    │  + Optuna     │
                    └──────────────┘    └───────────────┘
 ```
 
@@ -122,18 +137,36 @@ The key innovation is that **the HMM acts as a gatekeeper** — the neural netwo
 ## 🛠️ Installation
 
 ```bash
-git clone https://github.com/ranjithvijik/markov.git
-cd markov
+git clone https://github.com/ranjithvijik/markovst.git
+cd markovst
 python -m venv markov-env
 source markov-env/bin/activate  # Windows: markov-env\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### Verify
+### Verify Installation
 
 ```bash
-python -c "import torch; import hmmlearn; import optuna; import streamlit; print('✅ Ready!')"
+python -c "import torch; import hmmlearn; import optuna; import streamlit; print('✅ All dependencies ready!')"
 ```
+
+**Expected output:** `✅ All dependencies ready!`
+
+If any import fails, install the missing package individually:
+
+```bash
+pip install torch hmmlearn optuna streamlit yfinance plotly openpyxl scikit-learn
+```
+
+### Python & Hardware Requirements
+
+| Requirement | Minimum | Recommended |
+|---|---|---|
+| Python | 3.8+ | 3.10+ |
+| RAM | 4 GB | 8+ GB |
+| CPU | Any | 4+ cores |
+| GPU | Not required | NVIDIA CUDA (for AMP) |
+| Disk | 500 MB | 1 GB |
 
 ---
 
@@ -145,64 +178,142 @@ streamlit run app.py
 
 Open the app at `http://localhost:8501`, configure the strategy from the sidebar, and click **🚀 Run Backtest**.
 
-See the **Visual Walkthrough** below for a screenshot-based tour of the inputs, outputs, and export artifacts.
+**Fastest test (under 15 seconds):**
+1. Ticker: `SPY`
+2. History: `10y`
+3. Architecture: `mlp`
+4. Uncheck **Enable Optuna Tuning**
+5. Click **🚀 Run Backtest**
 
----
+See the **Visual Walkthrough** below for a screenshot-based tour of all inputs, outputs, and export artifacts.
 
 ---
 
 ## 📸 Visual Walkthrough
 
-This app follows a simple workflow: configure the backtest in the sidebar, run the experiment, inspect the dashboard, validate the metrics, and export the final artifacts.
+This app follows a simple workflow: configure the backtest in the sidebar → run the experiment → inspect the dashboard → validate the metrics → export artifacts.
 
-### 1. Configure the inputs
+---
 
-The left sidebar controls the full experiment setup. From here, you define the asset or portfolio, data history, model architecture, HMM regime settings, trading thresholds, risk overlays, hyperparameter tuning behavior, and walk-forward validation options.
+### Step 1 — Configure Inputs
 
-#### Sidebar overview
+The left sidebar is the control center for the entire experiment. It is organized into six sections: Data Settings, Model Architectures, Trading Constraints, Risk Management, Hyperparameter Tuning, and Validation & Walk-Forward.
+
+#### Top sidebar: asset selection and model settings
+
 ![Sidebar overview](docs/images/sidebar-overview.jpg)
 
-#### Advanced sidebar settings
+> **What you're seeing:** The top panel sets the ticker (`TSLA`), history period (`10y`), interval (`1d`), NN architecture (`mlp`), HMM hidden states (`3`), and hidden dimension (`64`).
+
+#### Middle sidebar: advanced model options
+
 ![Advanced sidebar settings](docs/images/sidebar-advanced.jpg)
 
-#### Trading, risk, and tuning controls
+> **What you're seeing:** Options for Student-t HMM (for fat-tailed assets like crypto), PyTorch AMP (GPU acceleration), and the Trading Constraints section controlling long/short probability thresholds, regime confidence gate, and target volatility.
+
+#### Lower sidebar: risk, tuning, and run button
+
 ![Trading, risk, and tuning controls](docs/images/sidebar-trading-risk.jpg)
 
-### 2. Review the dashboard output
+> **What you're seeing:** Transaction cost settings (fixed cost and spread in bps), risk management (stop loss / take profit / max drawdown halt), Optuna hyperparameter tuning, walk-forward validation splits, and the red **🚀 Run Backtest** button.
 
-Once you click **🚀 Run Backtest**, the app generates a rich dashboard that combines performance visualization with model diagnostics. This includes equity curves, benchmark comparisons, drawdowns, signal overlays, regime behavior, rolling Sharpe, annual return comparisons, and hyperparameter tuning logs.
+---
 
-#### Main dashboard
+### Step 2 — Review the Dashboard
+
+Once you click **🚀 Run Backtest**, the app produces a multi-panel interactive dashboard under the **Dashboard View** tab.
+
+#### Main dashboard — equity curves and performance table
+
 ![Main dashboard](docs/images/dashboard-main.jpg)
 
-#### Diagnostics view
+> **What you're seeing:** Log-scale cumulative equity curves for all strategies (Hybrid Markov+NN in teal, Buy & Hold in grey, Logistic Regression in orange, Monte Carlo strategies in purple/white). The embedded Performance Summary table on the right shows CAGR, Vol, Sharpe, Sortino, Max DD, Hit Rate, and Calmar for each model.
+
+**How to read the equity curves:**
+- A rising curve = compounding gains over time
+- Log scale means equal vertical distances = equal percentage moves
+- The gap between the hybrid model and Buy & Hold reflects the strategy's alpha (or lack thereof)
+- Flat sections = the system was in FLAT (no position) due to regime gating
+
+#### Dashboard diagnostics — walk-forward tuning and statistical significance
+
 ![Dashboard diagnostics](docs/images/dashboard-diagnostics.jpg)
 
-#### Signals and drawdowns
+> **What you're seeing (top left):** Walk-Forward Hyperparameter Tuning Log — bar heights show the number of hidden states selected per fold; the orange line shows the best Optuna trial number per fold. This lets you see whether tuning is consistent across time periods.
+>
+> **What you're seeing (top right):** Statistical Significance table — Sharpe point estimate, 95% confidence interval, PSR vs Zero (probability Sharpe > 0), Deflated SR, T-Statistic, P-Value, and whether the result is significant at 5%. A p-value above 0.05 means you cannot reject the null hypothesis that the strategy has zero edge.
+>
+> **What you're seeing (bottom left):** Rolling 63-Day Sharpe Ratio — shows how the strategy's risk-adjusted performance evolves over time. Sustained positive values indicate consistent alpha; large negative swings indicate regime mismatch periods.
+>
+> **What you're seeing (bottom right):** Annual Returns (%) bar chart — compares the hybrid strategy's year-by-year returns against Buy & Hold.
+
+#### Dashboard signals and drawdowns
+
 ![Dashboard signals and drawdowns](docs/images/dashboard-signals.jpg)
 
-### 3. Validate the tabular metrics
+> **What you're seeing (top):** Strategy Drawdowns (Underwater) — shows the percentage decline from peak for each strategy over time. Shallower drawdowns = better capital preservation.
+>
+> **What you're seeing (bottom left):** NN Probabilities & Trading Signals — the teal line is the NN's up-probability; green/red markers are actual long/short signals; grey markers show periods of FLAT (no signal, typically due to regime gate).
+>
+> **What you're seeing (bottom right):** HMM Regime Stability — shows the fraction of time the model spends in each identified regime state. Dominant stable regimes (tall bars) indicate the HMM has found clean market phases.
 
-The **Data & Metrics** tab is where you confirm whether the strategy is actually worth trusting. It surfaces the headline performance summary, statistical significance tests, and monthly returns tables in a format that is easier to audit before acting on results.
+---
+
+### Step 3 — Validate the Metrics
+
+The **Data & Metrics** tab surfaces all quantitative outputs in tabular form for auditing.
 
 ![Data and Metrics tab](docs/images/data-metrics-tab.jpg)
 
-### 4. Export the artifacts
+> **What you're seeing:**
+> - **Performance Summary** (top): CAGR, volatility, Sharpe, Sortino, max drawdown, hit rate, and Calmar ratio for each strategy. Compare the Hybrid Markov+NN row against Buy & Hold and Logistic Regression to assess whether the complexity is justified.
+> - **Statistical Tests** (bottom left): Formal hypothesis tests on the strategy Sharpe. Key fields: `psr_vs_zero` (should be > 0.95 for confidence), `psr_z_score`, and `deflated_sr`.
+> - **Monthly Returns** (bottom right): Month-by-month return table across all strategies. Use this to identify seasonal patterns, drawdown clusters, or recovery periods.
 
-The **Downloads** tab lets you package the run for research, sharing, or offline review. You can export the master Excel workbook, the interactive HTML dashboard, and the raw logs / CSV outputs.
+**Key metrics to check first:**
+
+| Metric | What it means | Good value |
+|---|---|---|
+| `cagr` | Compound annual growth rate | > benchmark CAGR |
+| `sharpe` | Risk-adjusted return (annualized) | > 0.5 |
+| `sortino` | Like Sharpe but penalizes only downside | > 1.0 |
+| `max_dd` | Worst peak-to-trough loss | > -30% (less negative) |
+| `hit_rate` | % of trades that were profitable | > 50% |
+| `calmar` | CAGR / abs(max drawdown) | > 0.5 |
+| `psr_vs_zero` | Probability Sharpe > 0 | > 0.95 |
+
+---
+
+### Step 4 — Export Artifacts
+
+The **Downloads** tab provides three export formats for sharing, archiving, or further analysis.
 
 ![Downloads tab](docs/images/downloads-tab.jpg)
 
-### 5. Recommended reading order
+> **What you're seeing:** Three download buttons — Master Excel (multi-sheet workbook), Interactive HTML (self-contained Plotly dashboard), and Raw Logs CSV (daily signals, probabilities, returns).
 
-For a new run, review results in this order:
+**When to use each:**
 
-1. **Performance Summary** — check CAGR, Sharpe, Sortino, drawdown, and hit rate.
-2. **Statistical Tests** — verify whether the apparent edge is statistically meaningful.
-3. **Equity Curves and Drawdowns** — inspect path dependency and downside behavior.
-4. **Signals / Regimes** — confirm the model is trading when conditions are stable.
-5. **Downloads** — export Excel, HTML, and logs for deeper analysis.
+| Export | Best for |
+|---|---|
+| **Master Excel** | Offline analysis, sharing with non-technical stakeholders, pivot tables |
+| **Interactive HTML** | Sharing the full dashboard — opens in any browser, no Python needed |
+| **Raw Logs CSV** | Custom research, importing into other tools, regime analysis |
 
+---
+
+### Step 5 — Recommended Reading Order
+
+After every backtest run, review results in this order to avoid being misled by surface-level metrics:
+
+1. **Statistical Tests** — check `psr_vs_zero` and p-value first. If the edge isn't statistically meaningful, don't act on any other metric.
+2. **Performance Summary** — compare CAGR, Sharpe, and max drawdown against Buy & Hold.
+3. **Equity Curves** — inspect the shape of the curve. Consistent uptrend is more trustworthy than a single spike.
+4. **Drawdowns** — check if drawdowns are shallow and short, or deep and prolonged.
+5. **Signals / Regimes** — confirm the model is trading in stable regimes and not just getting lucky in quiet periods.
+6. **Downloads** — export everything for audit trail.
+
+---
 
 ## 🖥️ Streamlit UI — Complete Guide
 
@@ -249,7 +360,7 @@ The entire system is controlled through the **left sidebar** in the Streamlit in
 │  Data Settings              │
 │                             │
 │  Ticker Symbol              │
-│  [SPY                    ]  │
+│  [TSLA                   ]  │
 │                             │
 │  History Period             │
 │  [10y              ▼]       │
@@ -278,22 +389,12 @@ The entire system is controlled through the **left sidebar** in the Streamlit in
 | International | `EWJ` (Japan), `FXI` (China), `EFA` (developed) |
 | Volatility | `VIXY` (VIX futures) |
 
-**In Portfolio Mode:** Enter comma-separated tickers in a text area: `SPY, QQQ, GLD, TLT`
-
 **Tips:**
 - Use `BTC-USD` not `BTCUSD` for crypto
 - Delisted tickers will cause errors — use currently active symbols
 - ETFs generally work better than individual stocks (more data, less noise)
 
 #### History Period
-
-| Field | Details |
-|---|---|
-| **Type** | Dropdown selector |
-| **Default** | `10y` |
-| **Options** | `1y`, `2y`, `5y`, `10y`, `max` |
-
-**What each option means:**
 
 | Period | Approximate Data Points | Best For |
 |---|---|---|
@@ -303,28 +404,16 @@ The entire system is controlled through the **left sidebar** in the Streamlit in
 | **`10y`** | **~2,520 trading days** | **Recommended default — includes multiple bull/bear cycles** |
 | `max` | All available history | Maximum statistical power, but older data may be less relevant |
 
-**Guidance:**
-- **Minimum recommended:** `5y` (need enough data for 5 walk-forward folds)
-- **Optimal:** `10y` (captures 2008 crisis aftermath, 2020 COVID crash, 2022 bear market)
-- **Crypto:** Use `5y` or less (most crypto data starts 2017-2018)
-- **More data = more reliable statistics** but older patterns may not repeat
-
-**⚠️ Minimum requirement:** The system needs at least 60 data points. With 5 CV splits, you realistically need 2+ years of daily data.
+> ⚠️ **Minimum requirement:** The system needs at least 60 data points. With 5 CV splits, you realistically need 2+ years of daily data.
 
 #### Interval
 
-| Field | Details |
-|---|---|
-| **Type** | Dropdown selector |
-| **Default** | `1d` |
-| **Options** | `1d`, `1wk` |
-
 | Interval | What It Means | When to Use |
 |---|---|---|
-| **`1d`** | Daily bars (Open, High, Low, Close, Volume per day) | **Default and recommended.** Most technical indicators are designed for daily data. |
-| `1wk` | Weekly bars | Longer-term strategies, less noise, fewer signals. Reduces data points by 5×. |
+| **`1d`** | Daily bars (OHLCV per day) | **Default and recommended** — most technical indicators are calibrated for daily data |
+| `1wk` | Weekly bars | Longer-term strategies, less noise, fewer signals |
 
-**Why no intraday?** The feature engineering (RSI, MACD, Bollinger Bands, etc.) is calibrated for daily timeframes. Using hourly data would require recalibrating all indicator lookback periods.
+> **Why no intraday?** RSI, MACD, and Bollinger Bands are calibrated for daily timeframes. Using hourly data would require recalibrating all indicator lookback periods.
 
 ---
 
@@ -336,9 +425,6 @@ The entire system is controlled through the **left sidebar** in the Streamlit in
 │                             │
 │  NN Architecture            │
 │  [mlp              ▼]       │
-│                             │
-│  Sequence Length (LSTM/Tr)  │
-│  [20                    ]   │
 │                             │
 │  HMM Hidden States          │
 │  [═══════●═══════] 3        │
@@ -354,138 +440,104 @@ The entire system is controlled through the **left sidebar** in the Streamlit in
 
 #### NN Architecture
 
-| Field | Details |
-|---|---|
-| **Type** | Dropdown selector |
-| **Default** | `mlp` |
-| **Options** | `mlp`, `resnet`, `lstm`, `transformer` |
-
-**Detailed comparison:**
-
 | Architecture | How It Works | Strengths | Weaknesses | Speed |
 |---|---|---|---|---|
-| **`mlp`** | Feed-forward network with 3 layers, BatchNorm, ReLU, Dropout | Fast, reliable baseline, works well with tabular features | Cannot model sequential patterns | ⚡ Fastest |
-| **`resnet`** | MLP with skip connections (residual blocks) | Can learn deeper representations without gradient vanishing | Slightly slower than MLP, may overfit with small data | ⚡ Fast |
-| **`lstm`** | Recurrent network with memory cells + attention mechanism | Captures sequential patterns (e.g., "3 down days followed by reversal") | Slower to train, needs sequence length tuning | 🐢 Slow |
-| **`transformer`** | Self-attention mechanism over sequence | Can learn long-range dependencies, parallelizable | Slowest, needs more data to avoid overfitting | 🐢 Slowest |
+| **`mlp`** | 3 layers, BatchNorm, ReLU, Dropout | Fast, reliable baseline, works well with tabular features | Cannot model sequential patterns | ⚡ Fastest |
+| **`resnet`** | MLP with skip connections (residual blocks) | Deeper representations without gradient vanishing | Slightly slower, may overfit on small data | ⚡ Fast |
+| **`lstm`** | Recurrent network with memory cells + attention | Captures sequential patterns (e.g., "3 down days → reversal") | Slower to train, needs sequence length tuning | 🐢 Slow |
+| **`transformer`** | Self-attention mechanism over sequence | Long-range dependencies, parallelizable | Slowest, needs more data to avoid overfitting | 🐢 Slowest |
+
+**Code anatomy of the MLP (from `app.py`):**
+```python
+class MLPNet(nn.Module):
+    def __init__(self, input_dim, hidden_dim=64, dropout=0.2):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.BatchNorm1d(hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim // 2, 1),
+            nn.Sigmoid()           # outputs P(price up tomorrow)
+        )
+    def forward(self, x):
+        if x.dim() == 3: x = x[:, -1, :]   # take last timestep for LSTM input
+        return self.net(x)
+```
+
+**ResNet skip connection — why it helps:**
+```python
+# Standard MLP: output = layer2(layer1(x))
+# ResNet:        output = layer2(layer1(x)) + x   ← skip adds original input back
+# This lets gradients flow directly backwards, enabling deeper networks without vanishing gradients
+```
 
 **When to use each:**
 
-| Scenario | Recommended Architecture |
+| Scenario | Recommended |
 |---|---|
-| First time running / quick test | `mlp` |
-| Want best speed-to-performance ratio | `mlp` or `resnet` |
-| Believe sequential patterns matter (momentum, mean reversion) | `lstm` |
-| Have GPU and lots of data (10y+) | `transformer` |
-| CS 230 paper replication | `lstm` with seq_len=30 |
-
-**Note:** When Optuna tuning is enabled, it searches over `mlp` and `resnet` automatically. LSTM and Transformer are selected via this dropdown for the final model but are NOT in the Optuna search space (they're too slow for inner-fold tuning).
-
-#### Sequence Length (LSTM/Transformer only)
-
-| Field | Details |
-|---|---|
-| **Type** | Number input |
-| **Default** | `20` |
-| **Appears** | Only when architecture is `lstm` or `transformer` |
-| **Tuned by Optuna** | Yes — searches `[20, 30, 40]` |
-
-**What it means:** How many past days the LSTM/Transformer looks at when making a prediction.
-
-| Value | Interpretation | Best For |
-|---|---|---|
-| `20` | ~1 month of trading days | Short-term patterns, mean reversion |
-| `30` | ~1.5 months (CS 230 paper's value) | Balanced — captures weekly and monthly cycles |
-| `40` | ~2 months | Longer-term trends, momentum strategies |
-
-**CS 230 paper finding:** *"All models use a timestep of 30 during data processing"* [8]. This is why 30 is included in the Optuna search space.
+| First run / quick test | `mlp` |
+| Speed-to-performance ratio | `mlp` or `resnet` |
+| Sequential patterns (momentum, mean reversion) | `lstm` |
+| GPU available + 10y data | `transformer` |
+| CS 230 paper replication | `lstm` with `seq_len=30` |
 
 #### HMM Hidden States
-
-| Field | Details |
-|---|---|
-| **Type** | Slider |
-| **Default** | `3` |
-| **Range** | `2` to `5` |
-| **Tuned by Optuna** | Yes — searches `[2, 3, 4]` |
 
 **What it means:** How many distinct "market moods" the HMM tries to identify.
 
 | States | Interpretation | When to Use |
 |---|---|---|
-| `2` | Bull vs Bear (simplest) | Crypto, assets with clear binary regimes |
-| **`3`** | **Bull vs Bear vs Uncertain (recommended)** | **Most assets — captures the "I don't know" state** |
+| `2` | Bull vs Bear | Crypto, assets with clear binary regimes |
+| **`3`** | **Bull / Bear / Uncertain (recommended)** | **Most assets — captures the "I don't know" state** |
 | `4` | Bull / Mild Bull / Mild Bear / Bear | Assets with gradual regime transitions |
-| `5` | Very granular regime detection | Only with very long histories (10y+), risk of overfitting |
+| `5` | Very granular detection | Only with 10y+ data — more states = more overfitting risk |
 
 **Guidance:**
-- **Start with 3** — it's the most interpretable (good/bad/uncertain)
-- **Use 2 for crypto** — crypto tends to have sharper regime transitions
-- **Avoid 5** unless you have 10+ years of data — more states = more parameters to estimate = more overfitting risk
+- **Start with 3** — it's the most interpretable and most stable
+- **Use 2 for crypto** — sharper transitions, binary regimes work better
+- **Avoid 5** unless you have 10+ years of data
 
 #### Hidden Dimension
 
-| Field | Details |
-|---|---|
-| **Type** | Dropdown selector |
-| **Default** | `64` |
-| **Options** | `32`, `64`, `128` |
-| **Tuned by Optuna** | Yes — searches `[32, 64]` |
-
-**What it means:** The number of neurons in each hidden layer of the neural network. Controls the model's "capacity" — how complex a pattern it can learn.
+The number of neurons per hidden layer — controls the model's *capacity* to learn complex patterns.
 
 | Value | Capacity | When to Use |
 |---|---|---|
-| `32` | Low — simple patterns only | Small datasets (<3 years), fast iteration, less overfitting |
+| `32` | Low | Small datasets (<3 years), fast iteration |
 | **`64`** | **Medium (recommended)** | **Default for most use cases** |
-| `128` | High — complex patterns | Large datasets (10y+), when 64 seems to underfit |
+| `128` | High | Large datasets (10y+), when 64 underfits |
 
-**CS 230 paper used 50 neurons** — our search space of [32, 64] brackets this value.
+> **CS 230 paper used 50 neurons.** Our search space of [32, 64] brackets this value.
 
 #### Use Student-t HMM
 
-| Field | Details |
-|---|---|
-| **Type** | Checkbox (toggle) |
-| **Default** | Unchecked (off) |
+| Setting | Distribution | Best For |
+|---|---|---|
+| **Unchecked** | Gaussian — bell-shaped returns | Most assets, faster, well-tested |
+| **Checked** | Student-t (ν=5) — heavy tails | Crypto, volatile small-caps, crash-prone assets |
 
-**What it means:**
+**Why Student-t matters:** Financial returns have *fat tails* — extreme moves happen far more often than a normal distribution predicts. The Student-t distribution with ν=5 degrees of freedom explicitly models this, making the HMM more robust to outliers during regime estimation.
 
-| Setting | HMM Type | Distribution | Best For |
-|---|---|---|---|
-| **Unchecked** | Gaussian HMM (`hmmlearn`) | Normal distribution — assumes returns are bell-shaped | Most assets, faster, well-tested |
-| **Checked** | Student-t HMM (custom implementation) | Heavy-tailed distribution — accounts for extreme moves | Crypto, volatile stocks, assets with frequent "black swan" events |
-
-**When to enable:**
-- ✅ Trading crypto (BTC, ETH) — extreme moves are common
-- ✅ Trading volatile small-caps — fat tails are the norm
-- ✅ You see the Gaussian HMM producing unrealistic regime classifications
-- ❌ Trading SPY/QQQ — Gaussian is usually sufficient
-- ❌ You want maximum speed — Student-t is ~2× slower
-
-**Technical detail:** The Student-t HMM uses degrees of freedom ν=5, which gives heavier tails than Gaussian. It's more robust to outliers during the EM parameter estimation.
+```
+Gaussian:   P(5σ move) ≈ 0.00003%   ← underestimates crashes
+Student-t:  P(5σ move) ≈ 0.2%       ← more realistic for markets
+```
 
 #### PyTorch AMP (GPU)
 
-| Field | Details |
-|---|---|
-| **Type** | Checkbox (toggle) |
-| **Default** | Unchecked (off) |
+Enables Automatic Mixed Precision training — uses 16-bit floats for matrix multiplications, 32-bit for accumulations.
 
-**What it means:** Enables Automatic Mixed Precision training, which uses 16-bit floating point for some operations to speed up GPU training.
+```
+CPU only:     AMP has no effect (safely ignored)
+NVIDIA GPU:   AMP ≈ 2× faster training, ~2× less VRAM usage
+Requirement:  NVIDIA GPU + CUDA toolkit + torch built with CUDA support
+```
 
-| Setting | Effect |
-|---|---|
-| **Unchecked** | Standard 32-bit training on CPU or GPU |
-| **Checked** | Mixed 16/32-bit training — ~2× faster on NVIDIA GPUs with CUDA |
-
-**When to enable:**
-- ✅ You have an NVIDIA GPU with CUDA installed
-- ✅ Running many Optuna trials (15+) and want to save time
-- ❌ You're on CPU only (will be ignored, no harm)
-- ❌ You're getting NaN losses (AMP can cause numerical instability in rare cases)
-
-**Requirements:** NVIDIA GPU + CUDA toolkit + `torch` compiled with CUDA support.
+> ⚠️ In rare cases, AMP can cause NaN losses due to float16 underflow. If you see unstable training, disable it.
 
 ---
 
@@ -518,175 +570,80 @@ The entire system is controlled through the **left sidebar** in the Streamlit in
 └─────────────────────────────┘
 ```
 
-#### Probability Threshold (Long)
+#### Probability Threshold (Long) and Short
 
-| Field | Details |
+The neural network outputs P(price up tomorrow) ∈ [0, 1]. These two thresholds define three zones:
+
+```
+[SHORT]  ←── prob_short ──── FLAT (no trade) ────  prob_long ──→  [LONG]
+          e.g. ≤0.48           0.48 to 0.52            ≥0.52
+```
+
+The **dead zone** between thresholds prevents trading on weak, ambiguous signals. Widening this gap (e.g., 0.45 / 0.55) reduces trade frequency but increases signal quality.
+
+| Setting | Behavior |
 |---|---|
-| **Type** | Slider |
-| **Default** | `0.52` |
-| **Range** | `0.50` to `0.99` |
-
-**What it means:** The neural network outputs a probability between 0 and 1 representing "how likely is the price to go UP tomorrow?" This threshold determines when to go LONG (buy).
-
-```
-If NN probability ≥ 0.52 → GO LONG (buy)
-If NN probability < 0.52 → Don't go long
-```
-
-| Value | Behavior | Trade Frequency | Signal Quality |
-|---|---|---|---|
-| `0.50` | Go long whenever model says >50% up | Very frequent trading | Many false signals |
-| **`0.52`** | **Slight edge required (recommended)** | **Moderate trading** | **Good balance** |
-| `0.55` | Need 55% confidence to trade | Less frequent | Higher quality signals |
-| `0.60` | Need 60% confidence | Rare trades | Very selective |
-| `0.70+` | Extremely selective | Very few trades | May miss opportunities |
-
-**Guidance:**
-- **0.52** is the sweet spot — requires the model to be slightly more confident than a coin flip
-- Increase to **0.55-0.60** if you're getting too many trades or too many false signals
-- Decrease to **0.50-0.51** if the model is too conservative and rarely trades
-
-#### Probability Threshold (Short)
-
-| Field | Details |
-|---|---|
-| **Type** | Slider |
-| **Default** | `0.48` |
-| **Range** | `0.01` to `0.50` |
-
-**What it means:** When the NN probability drops BELOW this threshold, the system goes SHORT (sells/bets on price decline).
-
-```
-If NN probability ≤ 0.48 → GO SHORT (sell)
-If NN probability > 0.48 → Don't go short
-```
-
-| Value | Behavior | Short Frequency |
-|---|---|---|
-| `0.50` | Short whenever model says <50% up | Very frequent shorting |
-| **`0.48`** | **Need slight bearish conviction (recommended)** | **Moderate** |
-| `0.45` | Need 55% bearish conviction | Less frequent |
-| `0.40` | Need 60% bearish conviction | Rare shorts |
-| `0.01` | Effectively disables shorting | Never shorts |
-
-**The "dead zone":** Between `prob_short` and `prob_long` (e.g., 0.48 to 0.52), the system stays FLAT — no position. This dead zone prevents trading on weak signals.
-
-```
-[SHORT]  ←── 0.48 ──── FLAT (no trade) ────  0.52 ──→  [LONG]
-```
-
-**Guidance:**
-- Keep `prob_short < prob_long` always (the system validates this)
-- Set `prob_short = 0.01` to create a **long-only** strategy (never shorts)
-- Widen the dead zone (e.g., 0.45/0.55) for fewer but higher-quality trades
+| `prob_long = 0.52` (default) | Go LONG when NN is slightly more than 50% confident |
+| `prob_short = 0.48` (default) | Go SHORT when NN is slightly more than 50% bearish |
+| `prob_short = 0.01` | **Long-only mode** — never shorts |
+| Wide gap (0.45 / 0.55) | Fewer trades, higher conviction only |
+| Tight gap (0.499 / 0.501) | Trades nearly every day — high friction cost |
 
 #### Regime Confidence Gate
 
-| Field | Details |
+The HMM outputs a posterior probability for each regime at each timestep. The gate requires this probability to exceed a threshold before a trade signal is valid.
+
+```
+LONG trade valid only if:  P(bull_state | data) ≥ regime_gate
+SHORT trade valid only if: P(bear_state | data) ≥ regime_gate
+Otherwise:                 Signal = FLAT
+```
+
+| Value | Effect |
 |---|---|
-| **Type** | Slider |
-| **Default** | `0.45` |
-| **Range** | `0.00` to `1.00` |
+| `0.00` | Gate disabled — trade regardless of regime clarity |
+| `0.30` | Low bar — more trades, some noise |
+| **`0.45`** | **Moderate (recommended)** — good balance |
+| `0.60` | High conviction only — fewer but cleaner trades |
+| `1.00` | Effectively no trades (impossible to satisfy) |
 
-**What it means:** The HMM outputs a probability for each regime (e.g., 70% bull, 20% bear, 10% uncertain). This gate requires the HMM to be at least X% confident in the favorable regime before allowing trades.
-
-```
-For LONG trades:  P(bull_state) must be ≥ 0.45
-For SHORT trades: P(bear_state) must be ≥ 0.45
-Otherwise:        Signal = 0 (FLAT, no trade)
-```
-
-| Value | Behavior | Effect |
-|---|---|---|
-| `0.00` | Disabled — trade regardless of regime | Maximum trades, no regime filtering |
-| `0.30` | Low bar — trade if regime is somewhat clear | More trades, some noise |
-| **`0.45`** | **Moderate confidence required (recommended)** | **Good balance of activity and quality** |
-| `0.60` | High confidence required | Fewer trades, only in clear regimes |
-| `0.80` | Very high confidence | Very few trades, only in extreme regimes |
-| `1.00` | Impossible to satisfy | No trades ever (effectively disables system) |
-
-**Why this matters:** During regime transitions (e.g., bull → bear), the HMM is uncertain — probabilities might be 40%/35%/25%. Trading during these transitions is dangerous because the model doesn't know what's happening. The gate prevents this.
-
-**Guidance:**
-- **0.45** works well for most assets
-- Lower to **0.30** if the system is too conservative (rarely trades)
-- Raise to **0.60** if you want only the highest-conviction trades
+> **Why this matters:** During regime transitions (bull → bear), HMM probabilities are diffuse (e.g., 35%/30%/35%). Trading in this uncertainty amplifies losses. The gate forces the model to wait for a clear regime before acting.
 
 #### Target Volatility
 
-| Field | Details |
-|---|---|
-| **Type** | Number input |
-| **Default** | `0.15` |
-| **Range** | `0` to any positive number |
-
-**What it means:** The annualized volatility you want your portfolio to have. The system automatically sizes positions to achieve this target.
+The system scales position size to target a specific annualized portfolio volatility:
 
 ```
-position_size = min(target_vol / yesterday's_realized_vol, 1.5)
+position_t = min(σ_target / σ̂_{t-1}, 1.5)
 ```
 
-| Value | Meaning | Effect |
+Where σ̂_{t-1} is yesterday's realized volatility (20-day rolling standard deviation of returns, annualized).
+
+**Worked examples:**
+
+| Market Condition | σ̂_{t-1} | Position Size (target=15%) |
 |---|---|---|
-| `0` | **Disabled** — no volatility targeting, always trade at 1× | Raw signals, no position sizing |
-| `0.10` | Target 10% annual vol | Conservative — smaller positions |
-| **`0.15`** | **Target 15% annual vol (recommended)** | **Moderate risk — similar to S&P 500 long-term vol** |
-| `0.20` | Target 20% annual vol | Aggressive — larger positions |
-| `0.30` | Target 30% annual vol | Very aggressive — may use leverage |
+| Very calm | 8% | min(15/8, 1.5) = **1.5× (max leverage)** |
+| Normal | 16% | min(15/16, 1.5) = **0.94×** |
+| Volatile | 25% | min(15/25, 1.5) = **0.60×** |
+| Crash (VIX spike) | 60% | min(15/60, 1.5) = **0.25×** |
 
-**How it works in practice:**
-- If SPY's recent volatility is 20% and target is 15%: position = 15%/20% = 0.75× (reduce exposure)
-- If SPY's recent volatility is 10% and target is 15%: position = 15%/10% = 1.5× (increase exposure, capped at 1.5×)
-- If SPY's recent volatility is 40% (crash): position = 15%/40% = 0.375× (dramatically reduce exposure)
+> Set `target_vol = 0` to disable position sizing entirely and always trade at 1× notional.
 
-**Guidance:**
-- **0.15** is appropriate for most equity strategies
-- Set to **0** for crypto (crypto vol is already 60-80%, targeting 15% would mean tiny positions)
-- Increase to **0.20-0.25** if you're comfortable with higher drawdowns
+#### Transaction Costs
 
-#### Fixed Cost (bps)
+Total cost per trade (both entry and exit) is:
 
-| Field | Details |
-|---|---|
-| **Type** | Number input |
-| **Default** | `2.00` |
-| **Unit** | Basis points (1 bps = 0.01%) |
+```
+cost = (fixed_cost_bps + spread_bps) × 2 × position_value × 0.0001
+```
 
-**What it means:** The fixed commission cost per trade, expressed in basis points of the trade value.
-
-| Value | Meaning | Typical For |
+| Asset Type | Recommended `fixed_cost` | Recommended `spread` |
 |---|---|---|
-| `0` | Zero commission | Commission-free brokers (Robinhood, etc.) |
-| `1.0` | 0.01% per trade | Institutional rates |
-| **`2.0`** | **0.02% per trade (recommended)** | **Conservative estimate for most brokers** |
-| `5.0` | 0.05% per trade | High-cost brokers or exotic instruments |
-| `10.0` | 0.10% per trade | Very expensive execution |
-
-**Example:** Trading $100,000 with cost_bps=2.0 → each trade costs $100,000 × 0.0002 = $20.
-
-#### Spread (bps)
-
-| Field | Details |
-|---|---|
-| **Type** | Number input |
-| **Default** | `1.00` |
-| **Unit** | Basis points |
-
-**What it means:** The bid-ask spread cost — the difference between the price you can buy at and the price you can sell at.
-
-| Value | Meaning | Typical For |
-|---|---|---|
-| `0.5` | Very tight spread | SPY, QQQ (most liquid ETFs) |
-| **`1.0`** | **Tight spread (recommended)** | **Large-cap stocks, major ETFs** |
-| `3.0` | Moderate spread | Mid-cap stocks, less liquid ETFs |
-| `5.0` | Wide spread | Small-caps, emerging market ETFs |
-| `10.0+` | Very wide spread | Illiquid assets, crypto on some exchanges |
-
-**Guidance:**
-- SPY/QQQ: `0.5-1.0` bps
-- Individual large-cap stocks: `1.0-2.0` bps
-- Crypto: `3.0-10.0` bps (varies by exchange)
-- Small-caps: `5.0-15.0` bps
+| SPY, QQQ (ETFs) | 1–2 bps | 0.5–1 bps |
+| Large-cap stocks | 2 bps | 1–2 bps |
+| Small-caps | 2–5 bps | 5–15 bps |
+| Crypto | 5–10 bps | 3–10 bps |
 
 ---
 
@@ -699,93 +656,47 @@ position_size = min(target_vol / yesterday's_realized_vol, 1.5)
 │  ☐ Enable Stop Loss /       │
 │    Take Profit              │
 │                             │
-│  Stop Loss %                │
-│  [0.020                 ]   │
-│                             │
-│  Take Profit %              │
-│  [0.050                 ]   │
-│                             │
-│  Max DD Halt %              │
-│  [0.10                  ]   │
+│  Stop Loss %      [0.02]    │
+│  Take Profit %    [0.05]    │
+│  Max DD Halt %    [0.10]    │
 └─────────────────────────────┘
 ```
 
-#### Enable Stop Loss / Take Profit
+#### Stop Loss and Take Profit
 
-| Field | Details |
-|---|---|
-| **Type** | Checkbox (toggle) |
-| **Default** | Unchecked (off) |
+When enabled, these apply *intraday* rules that override the model's signal:
 
-**What it means:** When enabled, activates the full risk management suite including stop-loss, take-profit, and trailing stop logic.
+```python
+# Stop Loss: close position if loss exceeds threshold from entry
+if (current_price / entry_price - 1) * direction < -stop_loss_pct:
+    close_position()
 
-| Setting | Effect |
-|---|---|
-| **Unchecked** | No intraday risk management — positions held until signal changes |
-| **Checked** | Active risk management — positions can be closed by stops |
+# Take Profit: lock in gains when target is reached
+if (current_price / entry_price - 1) * direction > take_profit_pct:
+    close_position()
+```
 
-**When to enable:**
-- ✅ Trading volatile assets (crypto, small-caps)
-- ✅ You want to cap maximum loss per trade
-- ✅ You want to lock in profits automatically
-- ❌ First time testing (adds complexity, harder to interpret results)
-- ❌ You want to see the "pure" model performance without risk overlays
+**Rule of thumb:** Take-profit should be ≥ 2× stop-loss to maintain a positive reward:risk ratio.
 
-#### Stop Loss % (appears when risk enabled)
-
-| Field | Details |
-|---|---|
-| **Type** | Number input |
-| **Default** | `0.02` (2%) |
-
-**What it means:** If a trade loses more than this percentage from entry, close it immediately.
-
-| Value | Meaning | Appropriate For |
+| Stop Loss | Take Profit | Reward:Risk |
 |---|---|---|
-| `0.01` | 1% stop | Very tight — frequent stops, may get "stopped out" of good trades |
-| **`0.02`** | **2% stop (recommended)** | **Standard for equities** |
-| `0.03` | 3% stop | Slightly wider — fewer false stops |
-| `0.05` | 5% stop | Wide — for volatile assets or longer holding periods |
-| `0.10` | 10% stop | Very wide — only for crypto or extreme volatility |
+| 2% | 5% | 2.5:1 ✅ |
+| 2% | 2% | 1:1 ❌ (needs > 50% win rate to be profitable) |
+| 5% | 10% | 2:1 ✅ |
 
-#### Take Profit % (appears when risk enabled)
+#### Max DD Halt
 
-| Field | Details |
-|---|---|
-| **Type** | Number input |
-| **Default** | `0.05` (5%) |
+A portfolio-level **circuit breaker**: if total drawdown from peak exceeds this threshold, all trading halts for the remainder of that fold.
 
-**What it means:** If a trade gains more than this percentage from entry, close it and lock in profits.
+```
+peak = max(portfolio_value over time)
+drawdown = (portfolio_value - peak) / peak
 
-| Value | Meaning |
-|---|---|
-| `0.03` | Take profit at 3% — conservative, frequent profit-taking |
-| **`0.05`** | **Take profit at 5% (recommended)** |
-| `0.10` | Take profit at 10% — lets winners run longer |
-| `0.20` | Take profit at 20% — very patient |
+if drawdown < -max_dd_halt:
+    halt_all_trading()     # no resumption in this fold
+```
 
-**Rule of thumb:** Take-profit should be 2-3× your stop-loss (reward:risk ratio ≥ 2:1).
-
-#### Max DD Halt %
-
-| Field | Details |
-|---|---|
-| **Type** | Number input |
-| **Default** | `0.10` (10%) |
-
-**What it means:** If the portfolio's total drawdown from its peak exceeds this percentage, **ALL trading is halted permanently** for the remainder of that fold. This is a "circuit breaker."
-
-| Value | Meaning |
-|---|---|
-| `0.05` | Halt at 5% drawdown — very conservative |
-| **`0.10`** | **Halt at 10% drawdown (recommended)** |
-| `0.15` | Halt at 15% drawdown |
-| `0.20` | Halt at 20% drawdown — aggressive |
-| `1.00` | Effectively disabled (100% drawdown would mean total loss) |
-
-**Why this exists:** Even with stop-losses on individual trades, a series of losing trades can compound. The circuit breaker prevents catastrophic loss by shutting everything down when things go wrong.
-
-**⚠️ Important:** Once triggered, trading does NOT resume in that fold. This is intentional — it simulates a real fund manager pulling the plug.
+> ⚠️ **Important:** Once triggered, trading does NOT resume. This intentionally simulates a fund manager pulling the plug after a defined loss event.
 
 ---
 
@@ -803,23 +714,11 @@ position_size = min(target_vol / yesterday's_realized_vol, 1.5)
 └─────────────────────────────┘
 ```
 
-#### Enable Optuna Tuning
+**Optuna** uses Tree-structured Parzen Estimator (TPE) Bayesian optimization to intelligently search the hyperparameter space:
 
-| Field | Details |
-|---|---|
-| **Type** | Checkbox (toggle) |
-| **Default** | Checked (on) |
+**Search space (CS 230 enhanced):**
 
-**What it means:** When enabled, the system uses Optuna's Bayesian optimization (Tree-structured Parzen Estimator) to automatically find the best hyperparameters within each walk-forward fold.
-
-| Setting | Effect | Runtime |
-|---|---|---|
-| **Checked** | Optuna searches 432 possible configurations per fold | 3-15 minutes |
-| **Unchecked** | Uses default config values (no search) | < 15 seconds |
-
-**What Optuna searches (CS 230 enhanced):**
-
-| Parameter | Search Space | Paper's Best [8] |
+| Parameter | Search Space | CS 230 Best |
 |---|---|---|
 | `n_states` | [2, 3, 4] | — |
 | `architecture` | [mlp, resnet] | — |
@@ -829,41 +728,21 @@ position_size = min(target_vol / yesterday's_realized_vol, 1.5)
 | `batch_size` | [32, 64] | **32** |
 | `seq_len` | [20, 30, 40] | **30** |
 
-**When to disable:**
-- Quick environment test (verify everything works)
-- Debugging feature engineering changes
-- You want deterministic results with specific parameters
+**How Optuna works per fold:**
+```
+Trial 1–2:  Random exploration (no prior knowledge)
+Trial 3+:   TPE builds a model of P(good params | past trials)
+            Samples from the promising region
+Best trial: Its hyperparameters used for the final outer-fold model
+```
 
-#### Optuna Trials per Fold
-
-| Field | Details |
-|---|---|
-| **Type** | Slider |
-| **Default** | `5` |
-| **Range** | `1` to `50` |
-
-**What it means:** How many different hyperparameter combinations Optuna tries within each walk-forward fold before selecting the best one.
-
-| Value | Search Quality | Runtime (per fold) | When to Use |
+| Trials | Quality | Runtime/fold | Use When |
 |---|---|---|---|
-| `1` | Minimal — essentially random | ~30 sec | Debugging only |
-| **`5`** | **Good — finds reasonable configs (recommended)** | **~2-3 min** | **Default for most use cases** |
-| `10` | Better — more thorough search | ~5-7 min | When you have time and want better results |
-| `15` | Thorough — good coverage of search space | ~8-12 min | Serious strategy development |
-| `25` | Very thorough | ~15-20 min | Final validation before deployment |
-| `50` | Exhaustive — diminishing returns | ~30-40 min | Research purposes only |
-
-**Guidance:**
-- **5 trials** is the sweet spot for development (fast enough to iterate, good enough to find decent params)
-- **15 trials** for final strategy validation
-- **50 trials** only if you're running overnight and want maximum confidence
-- More trials = better hyperparameters but with diminishing returns after ~15-20
-
-**How Optuna works internally:**
-1. Trial 1-2: Random exploration
-2. Trial 3+: Bayesian optimization — uses results from previous trials to intelligently choose next configuration
-3. Each trial trains a model on inner folds and evaluates on inner validation set
-4. Best trial's hyperparameters are used for the final model on the outer test fold
+| `1` | Random | ~30 sec | Debugging only |
+| **`5`** | **Good (recommended)** | **~2–3 min** | **Default** |
+| `10` | Better | ~5–7 min | More time available |
+| `15` | Thorough | ~8–12 min | Final validation |
+| `50` | Exhaustive | ~30–40 min | Overnight research |
 
 ---
 
@@ -881,54 +760,9 @@ position_size = min(target_vol / yesterday's_realized_vol, 1.5)
 └─────────────────────────────┘
 ```
 
-#### CV Splits
+#### Why Walk-Forward?
 
-| Field | Details |
-|---|---|
-| **Type** | Slider |
-| **Default** | `5` |
-| **Range** | `2` to `10` |
-
-**What it means:** How many walk-forward folds to use. Each fold trains on past data and tests on a future chunk.
-
-| Value | Test Periods | Data per Fold | Statistical Reliability |
-|---|---|---|---|
-| `2` | 2 test periods | Large train, large test | Low — only 2 out-of-sample evaluations |
-| `3` | 3 test periods | Large train, medium test | Moderate |
-| **`5`** | **5 test periods** | **Medium train, medium test** | **Good balance (recommended)** |
-| `7` | 7 test periods | Smaller train, smaller test | High reliability, but each fold has less data |
-| `10` | 10 test periods | Small train, small test | Maximum reliability, but may underfit |
-
-**Trade-offs:**
-
-| More Splits (7-10) | Fewer Splits (2-3) |
-|---|---|
-| ✅ More out-of-sample evaluations | ✅ More training data per fold |
-| ✅ More statistically reliable | ✅ Model can learn more complex patterns |
-| ❌ Less training data per fold | ❌ Fewer test evaluations |
-| ❌ Slower (more folds to process) | ❌ Less reliable statistics |
-
-**Guidance:**
-- **5 splits** is optimal for 10 years of daily data (~500 test days per fold)
-- Use **3 splits** if you only have 2-3 years of data
-- Use **7 splits** if you have 10+ years and want maximum statistical confidence
-- **Never use 2** unless you're just debugging
-
-#### Anchored Walk-Forward
-
-| Field | Details |
-|---|---|
-| **Type** | Checkbox (toggle) |
-| **Default** | Unchecked (off) |
-
-**What it means:** Controls whether the training window grows over time or stays fixed.
-
-| Setting | Training Window | Effect |
-|---|---|---|
-| **Unchecked (Rolling)** | Fixed size — drops old data as new data is added | Each fold has the same amount of training data. Assumes recent data is more relevant than old data. |
-| **Checked (Anchored)** | Expanding — always starts from the beginning | Later folds have MORE training data. Assumes all historical data is valuable. |
-
-**Visual comparison:**
+Traditional train/test splits leak the future into the training set. Walk-forward validation ensures the model only ever learns from past data and is always evaluated on unseen future data:
 
 ```
 ROLLING (default):
@@ -942,12 +776,21 @@ Fold 2: [=======TRAIN=======][TEST]
 Fold 3: [==========TRAIN==========][TEST]    ← Growing train size
 ```
 
-| Use Rolling When | Use Anchored When |
+**When to use each:**
+
+| Rolling (default) | Anchored |
 |---|---|
-| Market structure changes over time | You believe all history is informative |
-| Recent data is more relevant | You want maximum training data in later folds |
-| Asset has undergone structural changes | Asset has been stable for decades |
-| **Most cases (recommended)** | Long-term equity indices (SPY 20y+) |
+| Market structure changes over time | All history is relevant |
+| Recent data matters more | Maximum training data for final folds |
+| Most assets | Long-running, stable indices (e.g., SPY 20y+) |
+
+#### CV Splits Guidance
+
+| Splits | Test Periods | Data Recommendation |
+|---|---|---|
+| `2–3` | 2–3 out-of-sample periods | Only 1–3 years of data |
+| **`5`** | **5 periods (recommended)** | **5–15 years of data** |
+| `7–10` | 7–10 periods | 15+ years; maximum statistical power |
 
 ---
 
@@ -955,51 +798,44 @@ Fold 3: [==========TRAIN==========][TEST]    ← Growing train size
 
 ```
 ┌─────────────────────────────┐
-│                             │
-│  [🚀 Run Backtest        ] │
-│                             │
+│  [🚀 Run Backtest        ]  │
 └─────────────────────────────┘
 ```
 
-| Field | Details |
-|---|---|
-| **Type** | Button (primary, full-width) |
-| **Color** | Red/Primary |
-
 **What happens when you click:**
 
-1. **Configuration is assembled** from all sidebar values
-2. **Data is downloaded** from Yahoo Finance (cached for 1 hour)
-3. **Features are computed** (21 technical indicators)
-4. **Walk-forward loop begins:**
-   - For each fold: Optuna tunes → HMM fits → NN trains → Signals generated → Performance computed
-5. **Results are compiled** into equity curves, statistics, and exports
-6. **Dashboard appears** in three tabs: Dashboard View, Data & Metrics, Downloads
+1. Configuration assembled from all sidebar values
+2. Data downloaded from Yahoo Finance (cached 1 hour)
+3. 21 technical features computed (RSI, MACD, Bollinger Bands, etc.)
+4. Walk-forward loop begins:
+   - Per fold: Optuna tunes → HMM fits → NN trains → signals generated → performance computed
+5. Results compiled into equity curves, statistics, and export files
+6. Dashboard appears across three tabs: **Dashboard View**, **Data & Metrics**, **Downloads**
 
-**Progress indicators:**
-- Progress bar shows fold completion (e.g., "Fold 3/5")
-- Status text shows current operation (e.g., "Tuning Optuna Trial 4/5")
-- Final message: "Execution Completed in X.Xs"
+**Progress indicators shown during run:**
+- Progress bar: `Fold 3/5`
+- Status text: `Tuning Optuna Trial 4/5`
+- Final: `✅ Execution Completed in 187.3s`
 
 ---
 
 ## 🚀 What's New — CS 230 Paper Integration
 
-This framework incorporates findings from Stanford CS 230 [8] which tested 6 LSTM configurations:
+This framework incorporates findings from Stanford CS 230 [8], which tested 6 LSTM configurations:
 
 | Model | Layers | Dropout | Batch Size | Best RMSE (FB) |
 |---|---|---|---|---|
 | 1 | 4 | 0.2 | 32 | 5.61 |
 | 2 | 4 | 0.1 | 32 | 6.98 |
 | 3 | 3 | 0.2 | 32 | 5.24 |
-| **4** | **3** | **0.1** | **32** | **4.89** ✓ |
+| **4** | **3** | **0.1** | **32** | **4.89 ✓ (best)** |
 | 5 | 3 | 0.2 | 64 | 6.68 |
 | 6 | 3 | 0.1 | 64 | 6.36 |
 
 **Key findings integrated into our Optuna search space:**
-- **Dropout 0.10** outperforms 0.20 → Added to search: `[0.10, 0.20, 0.35]`
-- **Batch size 32** outperforms 64 → Added to search: `[32, 64]`
-- **Timestep 30** used as default → Added to search: `[20, 30, 40]`
+- **Dropout 0.10** outperforms 0.20 → Search: `[0.10, 0.20, 0.35]`
+- **Batch size 32** outperforms 64 → Search: `[32, 64]`
+- **Timestep 30** used as default → Search: `[20, 30, 40]`
 
 ---
 
@@ -1010,11 +846,24 @@ This framework incorporates findings from Stanford CS 230 [8] which tested 6 LST
 | Stage | What Happens | Why It Matters |
 |---|---|---|
 | **1. Data** | Downloads OHLCV with retry logic | Handles API failures gracefully |
-| **2. Features** | 21 technical indicators | Transforms noise into learnable signals |
-| **3. HMM** | Classifies market regime | Prevents trading in chaos |
-| **4. Neural Net** | Predicts up/down probability | Core prediction engine |
-| **5. Validation** | Walk-forward + Optuna | Ensures real out-of-sample performance |
-| **6. Reporting** | Excel + HTML + CSV | Professional output for analysis |
+| **2. Features** | 21 technical indicators | Transforms price noise into learnable signals |
+| **3. HMM** | Classifies market regime via Baum-Welch EM | Prevents trading in chaotic, uncertain markets |
+| **4. Neural Net** | Predicts P(price up tomorrow) | Core directional prediction engine |
+| **5. Validation** | Walk-forward + Optuna Bayesian tuning | Ensures genuinely out-of-sample performance |
+| **6. Reporting** | Excel + HTML + CSV export | Professional artifacts for analysis and sharing |
+
+### Feature Engineering (21 Indicators)
+
+The 21 features computed from raw OHLCV data include:
+
+| Category | Features |
+|---|---|
+| **Trend** | SMA(10), SMA(20), SMA(50), EMA(12), EMA(26) |
+| **Momentum** | RSI(14), MACD, MACD Signal, MACD Histogram |
+| **Volatility** | Bollinger Band width, ATR(14), realized vol (20d) |
+| **Volume** | OBV, Volume z-score |
+| **Price** | Log returns, overnight gap, high-low range, close position in range |
+| **Regime** | Rolling return skewness, kurtosis |
 
 ---
 
@@ -1022,66 +871,106 @@ This framework incorporates findings from Stanford CS 230 [8] which tested 6 LST
 
 ### Hidden Markov Model — Reading the Market's Mood
 
-The HMM identifies latent market states using:
+The HMM finds hidden states S ∈ {1,...,K} that explain observed return sequences X₁,...,Xₙ. The model is defined by three components:
 
-**Transition probabilities** — How likely is the market to switch moods?
-```
-Aᵢⱼ = P(Sₜ₊₁ = j | Sₜ = i)
-```
+**Transition matrix A** — probability of switching regimes:
 
-**Emission probabilities** — Given the mood, what patterns do we expect?
 ```
-bᵢ(Xₜ) = 𝒩(Xₜ; μᵢ, Σᵢ)
+A[i,j] = P(S_{t+1} = j | S_t = i)
 ```
 
-**Posterior probability** — What mood is the market in NOW?
+A high A[bull, bull] (e.g., 0.95) means bull markets are persistent. A low value means frequent switching.
+
+**Emission distribution B** — what returns look like in each regime:
+
 ```
-γₜ(i) = P(Sₜ = i | all observations)
+b_i(X_t) = N(X_t ; μ_i, Σ_i)        (Gaussian HMM)
+b_i(X_t) = t_ν(X_t ; μ_i, Σ_i)     (Student-t HMM, ν=5)
 ```
 
-**Cholesky decomposition** for numerical stability:
+**Posterior probability** — the probability of being in state i at time t given all data:
+
 ```
-Σ = LLᵀ → D²(x,μ) = ‖L⁻¹(x-μ)‖²
+γ_t(i) = P(S_t = i | X_1,...,X_n)   (computed via Forward-Backward algorithm)
 ```
+
+**Cholesky decomposition** for numerical stability (prevents the covariance matrix from becoming non-positive-definite):
+
+```
+Σ = L Lᵀ     (Cholesky factorization)
+D²(x, μ) = ‖ L⁻¹(x - μ) ‖²         (Mahalanobis distance in whitened space)
+```
+
+**Parameters estimated via Baum-Welch EM** — iteratively updates A, μ, and Σ to maximize log-likelihood of the data.
 
 ### Neural Networks — Predicting Direction
 
-**LSTM gates** (from CS 230 paper):
+**LSTM gates** (from CS 230 paper, Model 4):
+
 ```
-fₜ = σ(Wf·[hₜ₋₁, xₜ] + bf)     Forget gate
-iₜ = σ(Wi·[hₜ₋₁, xₜ] + bi)     Input gate
-cₜ = fₜ⊙cₜ₋₁ + iₜ⊙tanh(Wc·[hₜ₋₁,xₜ]+bc)   Cell update
-hₜ = σ(Wo·[hₜ₋₁,xₜ]+bo) ⊙ tanh(cₜ)          Output
+f_t = σ(W_f · [h_{t-1}, x_t] + b_f)                          Forget gate
+i_t = σ(W_i · [h_{t-1}, x_t] + b_i)                          Input gate
+c_t = f_t ⊙ c_{t-1} + i_t ⊙ tanh(W_c · [h_{t-1}, x_t] + b_c)  Cell update
+h_t = σ(W_o · [h_{t-1}, x_t] + b_o) ⊙ tanh(c_t)             Output
 ```
 
-**Attention mechanism** (our enhancement):
+- `f_t`: decides what fraction of the memory to *forget* (e.g., old trend info)
+- `i_t`: decides what new information to *write* to memory
+- `c_t`: the memory cell — accumulates information across timesteps
+- `h_t`: the hidden state passed to the next timestep and to the output layer
+
+**Attention mechanism** (our enhancement over the CS 230 baseline):
+
 ```
-αₜ = softmax(vᵀ·tanh(Wₐhₜ))    Which past days matter most?
-context = Σₜ αₜ·hₜ              Weighted combination
+α_t = softmax(vᵀ · tanh(W_a · h_t))    ← learned importance weight for each day
+context = Σ_t  α_t · h_t               ← weighted combination of all hidden states
+output  = sigmoid(W_out · context)      ← P(price up tomorrow)
 ```
+
+The attention layer learns which of the past `seq_len` days matter most for the prediction, rather than giving all days equal weight.
 
 ### Volatility Targeting — Sizing the Bet
 
 ```
-position = min(σ_target / σ̂_{t-1}, 1.5)
-
-Calm market (σ=10%): position = 15%/10% = 1.5× (max leverage)
-Normal (σ=16%):      position = 15%/16% = 0.94×
-Crash (σ=40%):       position = 15%/40% = 0.375× (cut exposure)
+position_t = min( σ_target / σ̂_{t-1},  1.5 )
 ```
 
-### Statistical Testing — Is It Real?
+Where σ̂_{t-1} is the 20-day rolling annualized realized volatility. The 1.5 cap prevents excessive leverage during ultra-calm periods.
 
-**Probabilistic Sharpe Ratio:**
 ```
-PSR = Φ((SR̂ - 0) / √Var(SR̂))
-Var(SR̂) = (1/(n-1))·[1 + ½SR² - γ₃·SR + (γ₄/4)·SR²]
+Calm market (σ=8%):  position = 15%/8%  = 1.875 → capped at 1.5×
+Normal (σ=15%):      position = 15%/15% = 1.0×
+Volatile (σ=25%):    position = 15%/25% = 0.6×
+Crash (σ=60%):       position = 15%/60% = 0.25× (cut 75% of exposure)
 ```
 
-**Deflated Sharpe Ratio** (multiple testing correction):
+### Statistical Testing — Is the Edge Real?
+
+The system computes three levels of statistical evidence:
+
+**1. Standard Sharpe Ratio** (annualized):
+
 ```
-DSR = PSR(SR̂, E[max random SR], n, skew, kurtosis)
+SR = (μ_r - r_f) / σ_r  ×  √252
 ```
+
+**2. Probabilistic Sharpe Ratio (PSR)** — accounts for non-normality of returns:
+
+```
+PSR(SR*) = Φ( (SR̂ - SR*) · √(n-1) / √(1 - γ₃·SR̂ + (γ₄/4)·SR̂²) )
+```
+
+Where γ₃ = skewness and γ₄ = excess kurtosis. `PSR(0)` gives P(true Sharpe > 0).
+
+**3. Deflated Sharpe Ratio (DSR)** — corrects for multiple testing bias (trying many parameters and reporting the best):
+
+```
+DSR = PSR( E[max SR | N trials] )
+```
+
+Where `E[max SR | N trials]` is the expected maximum Sharpe from N random strategies. A high DSR means the edge is genuine even after accounting for the fact that we tried multiple configurations.
+
+> **Practical rule:** If `psr_vs_zero < 0.95` or `p_value > 0.05`, the strategy's edge is not statistically significant — the apparent performance could be due to luck.
 
 ---
 
@@ -1089,28 +978,98 @@ DSR = PSR(SR̂, E[max random SR], n, skew, kurtosis)
 
 ### Dashboard Tab (10 Panels)
 
-1. Cumulative equity curves (log scale)
-2. Performance summary table
-3. Drawdown analysis
-4. Monthly return distributions
-5. NN probabilities & trade signals
-6. Regime stability mask
-7. Hyperparameter tuning log
-8. Statistical significance tests
-9. Rolling 63-day Sharpe ratio
-10. Annual returns comparison
+| Panel | What to Look For |
+|---|---|
+| **1. Cumulative Equity Curves** | Consistent uptrend; hybrid model vs benchmarks |
+| **2. Performance Summary** | CAGR > benchmark; Sharpe > 0.5; Max DD manageable |
+| **3. Drawdown (Underwater)** | Shallow, short drawdowns indicate risk control working |
+| **4. Monthly Return Distribution** | Positive skew; few large negative outliers |
+| **5. NN Probabilities & Signals** | Signals clustered in clear regimes; few signals during chaos |
+| **6. HMM Regime Stability** | Dominant tall bars indicate clean regime detection |
+| **7. Hyperparameter Tuning Log** | Consistent best hyperparams across folds = robust model |
+| **8. Statistical Significance** | PSR > 0.95; p-value < 0.05 for real edge |
+| **9. Rolling 63-Day Sharpe** | Consistently positive suggests persistent alpha |
+| **10. Annual Returns** | No single year driving all returns (concentration risk) |
+
+### Data & Metrics Tab
+
+| Table | Purpose |
+|---|---|
+| **Performance Summary** | Side-by-side comparison of all strategies on 7 metrics |
+| **Statistical Tests** | Formal hypothesis tests — p-value, PSR, deflated Sharpe |
+| **Monthly Returns** | Month-by-month return breakdown for all strategies |
 
 ### Downloads Tab
 
 | Export | Format | Contents |
 |---|---|---|
-| Master Excel | `.xlsx` | 6 sheets: Summary, EquityCurve, MonthlyReturns, HyperparamLog, StatisticalTests, Configuration |
-| Interactive HTML | `.html` | Full Plotly dashboard (shareable, no Python needed) |
-| Raw Signals CSV | `.csv` | Daily signals, probabilities, returns for further analysis |
+| **Master Excel** | `.xlsx` | 6 sheets: Summary, EquityCurve, MonthlyReturns, HyperparamLog, StatisticalTests, Configuration |
+| **Interactive HTML** | `.html` | Full Plotly dashboard — shareable, opens in any browser |
+| **Raw Signals CSV** | `.csv` | Daily signals, probabilities, returns for downstream research |
+
+---
+
+## 🔬 Pipeline Deep Dive
+
+### Feature Engineering → HMM → Neural Net flow
+
+```python
+# Step 1: Raw OHLCV → 21 features (simplified)
+df['rsi_14'] = compute_rsi(df['Close'], 14)
+df['macd']   = ema(df['Close'], 12) - ema(df['Close'], 26)
+df['bb_width'] = (upper_band - lower_band) / middle_band
+# ... 18 more indicators
+
+# Step 2: HMM fits on feature subset (returns + volatility features)
+hmm = GaussianHMM(n_components=n_states, covariance_type='full')
+hmm.fit(regime_features)
+regimes = hmm.predict(regime_features)           # [0, 0, 1, 2, 0, 1, ...]
+posteriors = hmm.predict_proba(regime_features)  # [[0.9, 0.1, 0.0], ...]
+
+# Step 3: NN trained on all features + regime as input
+X = np.hstack([all_features, regimes.reshape(-1, 1)])
+y = (returns.shift(-1) > 0).astype(int)  # 1 = price up tomorrow
+model = MLPNet(input_dim=X.shape[1], hidden_dim=64)
+train(model, X_train, y_train)
+
+# Step 4: Signal generation with gating
+for t in range(len(test_data)):
+    regime_prob = posteriors[t, best_regime]
+    nn_prob = model(X[t])
+
+    if regime_stable(t) and regime_prob >= gate:
+        if nn_prob >= prob_long:  signal[t] = +1  # LONG
+        elif nn_prob <= prob_short: signal[t] = -1  # SHORT
+        else:                       signal[t] = 0   # FLAT
+    else:
+        signal[t] = 0  # FLAT — regime unclear
+```
+
+---
+
+## 🗂️ Code Architecture
+
+`app.py` is a single-file application (~1,800 lines) organized into clearly separated sections:
+
+| Lines (approx) | Section | What it does |
+|---|---|---|
+| 1–80 | Imports & Config | All imports, `@dataclass` config definition |
+| 80–200 | Feature Engineering | `compute_features()` — all 21 indicators |
+| 200–350 | HMM Layer | `GaussianHMMRegime`, `StudentTHMM` classes |
+| 350–550 | Neural Networks | `MLPNet`, `ResNet`, `LSTMNet`, `TransformerNet` |
+| 550–750 | Training Loop | `train_model()`, `evaluate_model()`, early stopping |
+| 750–950 | Walk-Forward + Optuna | `run_walkforward()`, `optuna_objective()` |
+| 950–1100 | Signal Generation | `generate_signals()`, volatility targeting, costs |
+| 1100–1300 | Risk Management | Stop-loss, take-profit, trailing stop, DD halt |
+| 1300–1500 | Benchmarks | Buy & Hold, Logistic Regression, Monte Carlo |
+| 1500–1650 | Statistics | Sharpe, PSR, DSR, skewness, kurtosis |
+| 1650–1800 | Streamlit UI | Sidebar, tabs, charts, downloads |
 
 ---
 
 ## 🚥 How It Works — Decision Flow
+
+Every trading day passes through 5 gates before a position is taken:
 
 ```
 Day T arrives
@@ -1118,26 +1077,26 @@ Day T arrives
     ▼
 ┌─────────────────────────────────┐
 │  GATE 1: Regime Stability       │
-│  ≤6 flips in 20 days?          │──── NO ──▶ FLAT
+│  ≤6 regime flips in 20 days?   │──── NO ──▶ FLAT (regime too noisy)
 └───────────────┬─────────────────┘
                 │ YES
                 ▼
 ┌─────────────────────────────────┐
 │  GATE 2: HMM Confidence        │
-│  P(regime) ≥ regime_gate?       │──── NO ──▶ FLAT
+│  P(regime) ≥ regime_gate?       │──── NO ──▶ FLAT (regime unclear)
 └───────────────┬─────────────────┘
                 │ YES
                 ▼
 ┌─────────────────────────────────┐
 │  GATE 3: NN Probability         │
-│  ≥ prob_long? → LONG            │
-│  ≤ prob_short? → SHORT          │──── NEITHER ──▶ FLAT
+│  prob ≥ prob_long?  → LONG      │
+│  prob ≤ prob_short? → SHORT     │──── NEITHER ──▶ FLAT (weak signal)
 └───────────────┬─────────────────┘
                 │
                 ▼
 ┌─────────────────────────────────┐
-│  GATE 4: Vol Sizing             │
-│  size = target_vol / σ̂_{t-1}    │
+│  GATE 4: Volatility Sizing      │
+│  size = min(σ_target/σ̂, 1.5)   │
 └───────────────┬─────────────────┘
                 │
                 ▼
@@ -1148,41 +1107,65 @@ Day T arrives
 └───────────────┬─────────────────┘
                 │
                 ▼
-         Execute Trade (minus costs)
+         Execute Trade (minus transaction costs)
 ```
 
 ---
 
 ## 🧪 Example Recipes
 
-| Use Case | Settings |
-|---|---|
-| **Quick test** | SPY, 10y, mlp, Optuna OFF → <15 sec |
-| **Standard backtest** | SPY, 10y, mlp, 5 trials, 5 folds → 3-5 min |
-| **CS 230 replication** | SPY, 10y, lstm, seq_len=30, 15 trials → 15-20 min |
-| **Crypto** | BTC-USD, 5y, mlp, Student-t HMM, vol_target=0 |
-| **Portfolio** | Portfolio mode, `SPY, QQQ, GLD, TLT`, 5 trials |
-| **Conservative** | prob_long=0.55, prob_short=0.45, regime_gate=0.60 |
-| **Aggressive** | prob_long=0.51, prob_short=0.49, regime_gate=0.30 |
+| Use Case | Settings | Est. Runtime |
+|---|---|---|
+| **Quick test** | SPY, 10y, mlp, Optuna OFF | < 15 sec |
+| **Standard backtest** | SPY, 10y, mlp, 5 trials, 5 folds | 3–5 min |
+| **CS 230 replication** | SPY, 10y, lstm, seq_len=30, 15 trials | 15–20 min |
+| **Crypto** | BTC-USD, 5y, mlp, Student-t HMM, vol_target=0 | 3–5 min |
+| **Portfolio** | Portfolio mode, `SPY, QQQ, GLD, TLT`, 5 trials | 15–30 min |
+| **Conservative** | prob_long=0.55, prob_short=0.45, regime_gate=0.60 | Any |
+| **Aggressive** | prob_long=0.51, prob_short=0.49, regime_gate=0.30 | Any |
+| **Long-only** | prob_short=0.01 | Any |
+| **No risk overlay** | Disable stop loss, max_dd_halt=1.0 | Any |
 
 ---
 
 ## 🧩 Extending the Framework
 
 ### Add a Feature (1 line)
+
 ```python
+# In compute_features() around line 100:
 features["my_indicator"] = close.rolling(10).mean() / close.rolling(50).mean()
 ```
 
-### Add an Architecture (20 lines)
+### Add a Neural Network Architecture (20 lines)
+
 ```python
 class MyNetwork(nn.Module):
-    def __init__(self, input_dim, hidden_dim=64, **kwargs):
+    def __init__(self, input_dim, hidden_dim=64, dropout=0.2, **kwargs):
         super().__init__()
-        self.net = nn.Sequential(...)
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, 1),
+            nn.Sigmoid()
+        )
+
     def forward(self, x):
-        if x.dim() == 3: x = x[:, -1, :]
+        if x.dim() == 3:
+            x = x[:, -1, :]     # take last timestep if 3D input
         return self.net(x)
+```
+
+Then add `"mynet": MyNetwork` to the `ARCHITECTURE_MAP` dict near the top of `app.py`.
+
+### Add a Custom Risk Rule
+
+```python
+# In generate_signals(), after signal generation:
+# Example: don't trade if VIX equivalent > 30
+realized_vol_annualized = returns.rolling(20).std() * np.sqrt(252)
+signals[realized_vol_annualized > 0.30] = 0   # force FLAT in extreme vol
 ```
 
 ---
@@ -1191,11 +1174,13 @@ class MyNetwork(nn.Module):
 
 | Limitation | Mitigation |
 |---|---|
-| Gaussian HMM may miss fat tails | Enable Student-t HMM |
-| Assumes regime stability within folds | Use shorter periods or anchored |
-| Daily frequency only | Supports `1wk`; intraday not implemented |
-| No market microstructure | Increase `impact_factor` for illiquid assets |
-| Survivorship bias possible | Use currently active tickers |
+| Gaussian HMM may miss fat tails | Enable Student-t HMM for crypto/volatile assets |
+| Assumes regime stability within folds | Use shorter history periods or anchored walk-forward |
+| Daily frequency only | `1wk` supported; intraday requires indicator recalibration |
+| No market microstructure modeling | Increase spread bps for illiquid assets |
+| Survivorship bias possible | Use currently active, liquid tickers |
+| No live trading connectivity | Use outputs to inform manual or automated execution |
+| Single-asset regime detection | HMM trained per-asset; no cross-asset regime information |
 
 ---
 
@@ -1216,12 +1201,22 @@ class MyNetwork(nn.Module):
 ## 📁 Project Structure
 
 ```
-markov/
-├── app.py              # Complete engine + Streamlit UI (~1,800 lines)
-├── README.md           # This file
-├── requirements.txt    # Python dependencies
-├── LICENSE             # MIT License
-└── .gitignore
+markovst/
+├── app.py                   # Complete engine + Streamlit UI (~1,800 lines)
+├── README.md                # This file
+├── requirements.txt         # Python dependencies
+├── LICENSE                  # MIT License
+├── .gitignore
+└── docs/
+    └── images/
+        ├── sidebar-overview.jpg        # Top sidebar (ticker, history, model arch)
+        ├── sidebar-advanced.jpg        # Middle sidebar (Student-t, AMP, thresholds)
+        ├── sidebar-trading-risk.jpg    # Lower sidebar (costs, risk, tuning, run button)
+        ├── dashboard-main.jpg          # Main equity curves + performance table
+        ├── dashboard-diagnostics.jpg   # Tuning log, stats, rolling Sharpe, annual returns
+        ├── dashboard-signals.jpg       # Drawdowns, NN signals, HMM regime stability
+        ├── data-metrics-tab.jpg        # Performance summary, statistical tests, monthly returns
+        └── downloads-tab.jpg           # Export artifacts panel
 ```
 
 ---
@@ -1230,10 +1225,18 @@ markov/
 
 | Scenario | Runtime | Memory |
 |---|---|---|
-| No tuning | < 15 sec | ~500 MB |
+| No tuning (mlp) | < 15 sec | ~500 MB |
 | MLP, 5 trials, 5 folds | 3–7 min | ~1.5 GB |
+| MLP, 15 trials, 5 folds | 8–15 min | ~1.5 GB |
 | LSTM, 15 trials, 5 folds | 15–25 min | ~1.5 GB |
+| Transformer, 15 trials, 5 folds | 25–40 min | ~2 GB |
 | Portfolio (4 assets), 5 trials | 15–30 min | ~1.5 GB |
+
+**Speedup tips:**
+- Use `mlp` architecture (fastest)
+- Disable Optuna or use 1–3 trials for exploration
+- Enable PyTorch AMP if you have an NVIDIA GPU
+- Use `1y` or `2y` history for rapid iteration
 
 ---
 
@@ -1241,28 +1244,57 @@ markov/
 
 | Issue | Solution |
 |---|---|
-| "No data returned" | Check ticker format (`BTC-USD` not `BTCUSD`) |
-| "HMM did not converge" | Harmless — Cholesky fallback handles it |
-| "Not enough samples" | Increase period or decrease CV splits |
-| "CUDA out of memory" | Reduce hidden dim or disable AMP |
-| Very slow | Reduce Optuna trials or disable tuning |
-| No trades generated | Lower regime_gate or narrow prob thresholds |
+| `"No data returned"` | Check ticker format — use `BTC-USD` not `BTCUSD` |
+| `"HMM did not converge"` | Harmless — Cholesky fallback handles it automatically |
+| `"Not enough samples"` | Increase history period or decrease CV splits |
+| `"CUDA out of memory"` | Reduce hidden dim to 32 or disable PyTorch AMP |
+| Very slow runtime | Reduce Optuna trials or disable tuning entirely |
+| `"No trades generated"` | Lower `regime_gate` (try 0.30) or narrow prob thresholds |
+| NaN losses during training | Disable AMP; reduce learning rate; check for infinite feature values |
+| `"Minimum 2 backtests required"` | In Portfolio mode, ensure at least 2 tickers return valid data |
+| High overfitting (train >> test Sharpe) | Increase Optuna trials; use rolling (not anchored) walk-forward |
 
 ---
 
 ## 📦 Dependencies
 
-| Package | Purpose |
-|---|---|
-| `torch` | Neural networks (MLP, ResNet, LSTM, Transformer) |
-| `hmmlearn` | Gaussian HMM regime detection |
-| `scipy` | Cholesky decomposition, statistical tests |
-| `optuna` | Bayesian hyperparameter optimization |
-| `plotly` | Interactive dashboards |
-| `openpyxl` | Excel workbook generation |
-| `streamlit` | Web UI |
-| `yfinance` | Market data |
-| `scikit-learn` | Scaling, splitting, benchmarks |
-| `pandas`, `numpy` | Data manipulation |
+| Package | Version | Purpose |
+|---|---|---|
+| `torch` | ≥1.13 | Neural networks (MLP, ResNet, LSTM, Transformer) |
+| `hmmlearn` | ≥0.3 | Gaussian HMM regime detection |
+| `scipy` | ≥1.9 | Cholesky decomposition, statistical tests |
+| `optuna` | ≥3.0 | Bayesian hyperparameter optimization |
+| `plotly` | ≥5.0 | Interactive dashboards |
+| `openpyxl` | ≥3.0 | Excel workbook generation |
+| `streamlit` | ≥1.20 | Web UI |
+| `yfinance` | ≥0.2 | Market data download |
+| `scikit-learn` | ≥1.0 | Scaling, splitting, logistic regression benchmark |
+| `pandas` | ≥1.5 | Data manipulation |
+| `numpy` | ≥1.23 | Numerical computation |
 
 ---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/my-enhancement`
+3. Make changes to `app.py`
+4. Test with at least one full backtest run (SPY, 10y, mlp, 5 trials)
+5. Submit a pull request with a description of what changed and why
+
+**Good areas for contribution:**
+- New neural network architectures
+- Additional technical indicators
+- Live trading broker integration
+- Multi-timeframe feature engineering
+- Portfolio optimization (beyond equal weight)
+
+---
+
+## 📄 License
+
+MIT License — see [LICENSE](LICENSE) for details. Free to use, modify, and distribute with attribution.
+
+---
+
+*Built with ❤️ using PyTorch, hmmlearn, Optuna, and Streamlit.*
